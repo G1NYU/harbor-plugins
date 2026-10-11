@@ -103,7 +103,7 @@
     {
       "id": "comix",
       "name": "Comix",
-      "version": "1.0.0-alpha.47",
+      "version": "1.0.0-alpha.48",
       "lang": "en",
       "nsfw": false,
       "icon": "https://raw.githubusercontent.com/inkdex/extensions/master/0.9/stable/Comix/static/icon.png",
