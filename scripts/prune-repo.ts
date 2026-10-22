@@ -3,6 +3,50 @@ import path from 'node:path';
 
 const DIST = path.join(process.cwd(), 'dist', 'manga');
 
+// Display order in repo.json: pinned first, then approximate popularity.
+// Ids missing from this list are placed at the end.
+const ORDER = [
+  'weebcentral',
+  'kaynscan',
+  'projectsuki',
+  'mangadex',
+  'nhentai',
+  'mgeko',
+  'kingofshojo',
+  'mangafire',
+  'manhuaplus',
+  'mangapill',
+  'flamecomics',
+  'hivetoons',
+  'mangadistrict',
+  'manhwaclub',
+  'lilymanga',
+  'mangaworld',
+  'mangaworldadult',
+  'rawkuma',
+  'tcbscans',
+  'likemanga',
+  'mangak',
+  'mangatown',
+  'royalroad',
+  'lnori',
+  'scythescans',
+  'reimanga',
+  'cocomic',
+  'batcave',
+  'manhwatoon',
+  'samuraiscan',
+  'mangaberri',
+  'mangacherri',
+  'chikari',
+  'rinkocomics',
+  'rokaricomics',
+  'scansgg',
+  'stonescape',
+  'dankefurslesen',
+  'punkrecords',
+];
+
 // Proven sources: shown in repo.json
 const KEEP = new Set([
   'flamecomics',
@@ -54,8 +98,12 @@ const repo = JSON.parse(fs.readFileSync(repoPath, 'utf-8'));
 const all: any[] = repo.plugins ?? [];
 
 const idOf = (p: any) => String(p.id).toLowerCase();
+const rank = (p: any) => {
+  const i = ORDER.indexOf(idOf(p));
+  return i < 0 ? ORDER.length : i;
+};
 
-const kept = all.filter((p) => KEEP.has(idOf(p)));
+const kept = all.filter((p) => KEEP.has(idOf(p))).sort((a, b) => rank(a) - rank(b));
 const testing = all.filter((p) => TESTING.has(idOf(p)));
 const removed = all.filter((p) => !KEEP.has(idOf(p)) && !TESTING.has(idOf(p)));
 
