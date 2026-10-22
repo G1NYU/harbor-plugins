@@ -4,7 +4,6 @@ import path from 'node:path';
 const DIST = path.join(process.cwd(), 'dist', 'manga');
 
 const KEEP = new Set([
-  'allmanga',
   'dragontea',
   'flamecomics',
   'hivetoons',
@@ -17,7 +16,6 @@ const KEEP = new Set([
   'mangapill',
   'mangaworld',
   'mangaworldadult',
-  'mangazin',
   'manhuaplus',
   'manhwaclub',
   'mgeko',
