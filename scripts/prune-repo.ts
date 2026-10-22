@@ -37,39 +37,21 @@ const KEEP = new Set([
   'rokaricomics',
   'scansgg',
   'stonescape',
-]);
-
-// Untested sources: shown in repo-testing.json (add ids here to try new ones)
-const TESTING = new Set<string>([
-  // Kitty Extensions
   'dankefurslesen',
-  'kaynscan',
-  'manga18club',
-  'mangahub',
-  'manhwaread',
-  'manhwatoon',
-  'onisaga',
-  'scythescans',
-  'silentquill',
-  'tcbscans',
-  'toontop',
-  'zinmanga',
-  // Kakarot Extension
   'batcave',
-  'elftoon',
   'godacomic',
-  'hentai2read',
-  'hitomi',
-  'mangaball',
-  'mangacloud',
+  'kaynscan',
   'mangak',
+  'manhwatoon',
   'nhentai',
   'projectsuki',
   'rawkuma',
-  'readallcomics',
-  'readcomicsonline',
-  'zipcomic',
+  'scythescans',
+  'tcbscans',
 ]);
+
+// Untested sources: shown in repo-testing.json (add ids here to try new ones)
+const TESTING = new Set<string>([]);
 
 const repoPath = path.join(DIST, 'repo.json');
 const repo = JSON.parse(fs.readFileSync(repoPath, 'utf-8'));
