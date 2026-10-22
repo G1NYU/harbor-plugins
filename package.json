@@ -5,7 +5,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "build": "tsx scripts/build.ts && tsx scripts/convert-paperback.ts",
+    "build": "tsx scripts/build.ts && tsx scripts/convert-paperback.ts && tsx scripts/prune-repo.ts",
     "convert": "tsx scripts/convert-paperback.ts",
     "sync-upstream": "tsx scripts/build.ts && tsx scripts/convert-paperback.ts && tsx scripts/validate.ts",
     "validate": "tsx scripts/validate.ts",
