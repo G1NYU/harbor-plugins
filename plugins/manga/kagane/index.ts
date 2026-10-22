@@ -1,6 +1,6 @@
 import type { MangaProvider, MangaSummary, MangaChapter } from '@shared/types/manga.js';
 
-const API = 'https://yuzuki.kagane.org/api/v2';
+const API = 'https://kagane.moe/api/v2';
 const PAGE = 24;
 const RATINGS = ['Safe', 'Suggestive'];
 
@@ -68,7 +68,7 @@ export const plugin: MangaProvider = {
   },
 
   async pageUrls(chapterId) {
-    // TODO: POST /books/{id}?intent=Read needs x-integrity-token.
+    // TODO: needs the books/{id}?intent=Read flow and x-integrity-token.
     harbor.log('pageUrls not implemented', chapterId);
     return [];
   },
