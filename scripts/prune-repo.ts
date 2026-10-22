@@ -10,7 +10,6 @@ const KEEP = new Set([
   'weebcentral',
   'mangafire',
   'mangadex',
-  'kagane',
   'lilymanga',
   'lnori',
   'mangadistrict',
