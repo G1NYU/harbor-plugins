@@ -5,6 +5,7 @@
   "lang": "en",
   "nsfw": false,
   "icon": "https://kagane.moe/favicon.ico",
+  "entry": "kagane.plugin.js",
   "description": "Kagane manga, manhwa and manhua",
   "website": "https://kagane.moe"
 }
