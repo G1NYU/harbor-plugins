@@ -40,7 +40,36 @@ const KEEP = new Set([
 ]);
 
 // Untested sources: shown in repo-testing.json (add ids here to try new ones)
-const TESTING = new Set<string>([]);
+const TESTING = new Set<string>([
+  // Kitty Extensions
+  'dankefurslesen',
+  'kaynscan',
+  'manga18club',
+  'mangahub',
+  'manhwaread',
+  'manhwatoon',
+  'onisaga',
+  'scythescans',
+  'silentquill',
+  'tcbscans',
+  'toontop',
+  'zinmanga',
+  // Kakarot Extension
+  'batcave',
+  'elftoon',
+  'godacomic',
+  'hentai2read',
+  'hitomi',
+  'mangaball',
+  'mangacloud',
+  'mangak',
+  'nhentai',
+  'projectsuki',
+  'rawkuma',
+  'readallcomics',
+  'readcomicsonline',
+  'zipcomic',
+]);
 
 const repoPath = path.join(DIST, 'repo.json');
 const repo = JSON.parse(fs.readFileSync(repoPath, 'utf-8'));

@@ -10,6 +10,16 @@
       "name": "PoppingMangoSources/general-extensions-mangago",
       "versioningUrl": "https://raw.githubusercontent.com/PoppingMangoSources/general-extensions-mangago/gh-pages/0.9/test/versioning.json",
       "rawBaseUrl": "https://raw.githubusercontent.com/PoppingMangoSources/general-extensions-mangago/gh-pages/0.9/test"
+    },
+    {
+      "name": "kittycatgit/kitty-extensions-0.9",
+      "versioningUrl": "https://raw.githubusercontent.com/kittycatgit/kitty-extensions-0.9/gh-pages/versioning.json",
+      "rawBaseUrl": "https://raw.githubusercontent.com/kittycatgit/kitty-extensions-0.9/gh-pages"
+    },
+    {
+      "name": "karrot0/KakarotExtension",
+      "versioningUrl": "https://raw.githubusercontent.com/karrot0/KakarotExtension/gh-pages/0.9/stable/versioning.json",
+      "rawBaseUrl": "https://raw.githubusercontent.com/karrot0/KakarotExtension/gh-pages/0.9/stable"
     }
   ],
   "syncMode": "all",
