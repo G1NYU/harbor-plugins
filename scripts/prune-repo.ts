@@ -23,35 +23,24 @@ const KEEP = new Set([
   'punkrecords',
   'royalroad',
   'samuraiscan',
-]);
-
-// Untested sources: shown in repo-testing.json
-const TESTING = new Set([
-  'bunmanga',
   'chikari',
   'cocomic',
   'kingofshojo',
   'likemanga',
-  'luacomic',
   'mangaberri',
   'mangacherri',
   'mangahere',
   'mangahome',
   'mangatown',
-  'myreadingmanga',
   'reimanga',
   'rinkocomics',
   'rokaricomics',
   'scansgg',
   'stonescape',
-  'templescan',
-  'toonkotsu',
-  'valirscans',
-  'violetscans',
-  'vymanga',
-  'xcomic',
-  'yaoime',
 ]);
+
+// Untested sources: shown in repo-testing.json (add ids here to try new ones)
+const TESTING = new Set<string>([]);
 
 const repoPath = path.join(DIST, 'repo.json');
 const repo = JSON.parse(fs.readFileSync(repoPath, 'utf-8'));
@@ -75,12 +64,14 @@ for (const p of removed) {
   if (fs.existsSync(f)) fs.rmSync(f);
 }
 
-const testingRepo = {
-  ...repo,
-  name: `${repo.name} (Testing)`,
-  plugins: testing,
-};
-fs.writeFileSync(path.join(DIST, 'repo-testing.json'), JSON.stringify(testingRepo, null, 2), 'utf-8');
+if (testing.length > 0) {
+  const testingRepo = {
+    ...repo,
+    name: `${repo.name} (Testing)`,
+    plugins: testing,
+  };
+  fs.writeFileSync(path.join(DIST, 'repo-testing.json'), JSON.stringify(testingRepo, null, 2), 'utf-8');
+}
 
 repo.plugins = kept;
 fs.writeFileSync(repoPath, JSON.stringify(repo, null, 2), 'utf-8');
