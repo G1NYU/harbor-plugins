@@ -5,10 +5,10 @@ const DIST = path.join(process.cwd(), 'dist', 'manga');
 
 // Proven sources: shown in repo.json
 const KEEP = new Set([
-  'dragontea',
   'flamecomics',
   'hivetoons',
   'weebcentral',
+  'mangafire',
   'mangadex',
   'kagane',
   'lilymanga',
@@ -29,8 +29,6 @@ const KEEP = new Set([
   'likemanga',
   'mangaberri',
   'mangacherri',
-  'mangahere',
-  'mangahome',
   'mangatown',
   'reimanga',
   'rinkocomics',
@@ -39,7 +37,6 @@ const KEEP = new Set([
   'stonescape',
   'dankefurslesen',
   'batcave',
-  'godacomic',
   'kaynscan',
   'mangak',
   'manhwatoon',
