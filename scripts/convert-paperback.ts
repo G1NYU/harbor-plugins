@@ -25,6 +25,12 @@ interface UpstreamVersioning {
   sources: UpstreamSource[];
 }
 
+interface UpstreamRef {
+  name?: string;
+  versioningUrl: string;
+  rawBaseUrl: string;
+}
+
 interface Config {
   upstream: {
     repo: string;
@@ -32,6 +38,7 @@ interface Config {
     versioningUrl: string;
     rawBaseUrl: string;
   };
+  extraUpstreams?: UpstreamRef[];
   syncMode: string;
   popular: string[];
   verified: string[];
@@ -52,6 +59,10 @@ interface PluginManifest {
   entry: string;
   description?: string;
   badges?: string[];
+}
+
+function toPluginId(id: string): string {
+  return id.toLowerCase().replace(/[^a-z0-9-_]/g, '-');
 }
 
 function createMockHarbor(): { register: (p: any) => void; registered?: any; http: any; parseHtml: any; log: any } {
@@ -96,7 +107,7 @@ async function fetchText(url: string): Promise<string> {
 }
 
 async function main() {
-  console.log('🔄 Starting Automated Manga Upstream Conversion Pipeline...');
+  console.log('Starting Automated Manga Upstream Conversion Pipeline...');
 
   if (!fs.existsSync(CONFIG_FILE)) {
     throw new Error(`Config file not found: ${CONFIG_FILE}`);
@@ -107,9 +118,37 @@ async function main() {
     fs.mkdirSync(DIST_MANGA_DIR, { recursive: true });
   }
 
-  console.log(`📡 Fetching upstream registry from: ${config.upstream.versioningUrl}`);
-  const versioning = await fetchJson<UpstreamVersioning>(config.upstream.versioningUrl);
-  console.log(`📦 Found ${versioning.sources.length} available upstream sources.\n`);
+  const upstreams: UpstreamRef[] = [
+    {
+      name: config.upstream.repo,
+      versioningUrl: config.upstream.versioningUrl,
+      rawBaseUrl: config.upstream.rawBaseUrl,
+    },
+    ...(config.extraUpstreams ?? []),
+  ];
+
+  const queue: Array<{ source: UpstreamSource; rawBaseUrl: string }> = [];
+  const seen = new Set<string>();
+
+  for (const up of upstreams) {
+    try {
+      console.log(`Fetching upstream registry from: ${up.versioningUrl}`);
+      const versioning = await fetchJson<UpstreamVersioning>(up.versioningUrl);
+      console.log(`Found ${versioning.sources.length} sources in ${up.name ?? up.versioningUrl}.`);
+      for (const s of versioning.sources) {
+        const pid = toPluginId(s.id);
+        if (seen.has(pid)) continue;
+        seen.add(pid);
+        queue.push({ source: s, rawBaseUrl: up.rawBaseUrl });
+      }
+    } catch (err: any) {
+      console.warn(`  Warning: could not read upstream ${up.versioningUrl}: ${err.message}`);
+    }
+  }
+
+  if (queue.length === 0) {
+    throw new Error('No upstream sources could be loaded');
+  }
 
   const popularSet = new Set(config.popular.map((s) => s.toLowerCase()));
   const verifiedSet = new Set(config.verified.map((s) => s.toLowerCase()));
@@ -118,13 +157,12 @@ async function main() {
   let successCount = 0;
   let skippedCount = 0;
 
-  // Process sources concurrently in batches of 5 to optimize network throughput
   const BATCH_SIZE = 5;
-  for (let i = 0; i < versioning.sources.length; i += BATCH_SIZE) {
-    const batch = versioning.sources.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < queue.length; i += BATCH_SIZE) {
+    const batch = queue.slice(i, i + BATCH_SIZE);
 
     await Promise.all(
-      batch.map(async (source) => {
+      batch.map(async ({ source, rawBaseUrl }) => {
         const sourceLower = source.id.toLowerCase();
         const isPopular = popularSet.has(sourceLower);
         const isVerified = verifiedSet.has(sourceLower);
@@ -135,9 +173,9 @@ async function main() {
           return;
         }
 
-        const pluginId = sourceLower.replace(/[^a-z0-9-_]/g, '-');
+        const pluginId = toPluginId(source.id);
         const bundleFileName = `${pluginId}.plugin.js`;
-        const bundleUrl = `${config.upstream.rawBaseUrl}/${source.id}/index.js`;
+        const bundleUrl = `${rawBaseUrl}/${source.id}/index.js`;
 
         try {
           const rawCode = await fetchText(bundleUrl);
@@ -147,7 +185,7 @@ async function main() {
             name: source.name || source.id,
             version: source.version || '1.0.0',
             description: source.description || `Manga source for ${source.name}`,
-            icon: `${config.upstream.rawBaseUrl}/${source.id}/static/icon.png`,
+            icon: `${rawBaseUrl}/${source.id}/static/icon.png`,
             language: source.language || 'en',
             contentRating: source.contentRating,
             isPopular,
@@ -158,19 +196,18 @@ async function main() {
           const sizeBytes = Buffer.byteLength(wrappedCode, 'utf-8');
 
           if (sizeBytes > config.options.maxBundleSizeMb * 1024 * 1024) {
-            console.warn(`  ⚠️ Skipping ${source.name}: exceeds max bundle size (${(sizeBytes / 1024 / 1024).toFixed(2)} MB)`);
+            console.warn(`  Skipping ${source.name}: exceeds max bundle size (${(sizeBytes / 1024 / 1024).toFixed(2)} MB)`);
             skippedCount++;
             return;
           }
 
           const isValid = testPlugin(wrappedCode, pluginId);
           if (!isValid) {
-            console.warn(`  ⚠️ Skipping ${source.name}: failed Harbor compatibility validation`);
+            console.warn(`  Skipping ${source.name}: failed Harbor compatibility validation`);
             skippedCount++;
             return;
           }
 
-          // Write bundle file to dist/manga/
           const destPath = path.join(DIST_MANGA_DIR, bundleFileName);
           fs.writeFileSync(destPath, wrappedCode, 'utf-8');
 
@@ -196,17 +233,16 @@ async function main() {
           });
 
           const badgeIndicator = badges.length > 0 ? ` [${badges.join(', ')}]` : '';
-          console.log(`  ✔ Converted ${source.name} (v${source.version})${badgeIndicator} -> ${(sizeBytes / 1024).toFixed(1)} KB`);
+          console.log(`  Converted ${source.name} (v${source.version})${badgeIndicator} -> ${(sizeBytes / 1024).toFixed(1)} KB`);
           successCount++;
         } catch (err: any) {
-          console.warn(`  ⚠️ Failed to process ${source.name}: ${err.message}`);
+          console.warn(`  Failed to process ${source.name}: ${err.message}`);
           skippedCount++;
         }
       })
     );
   }
 
-  // Also include any custom manual plugins from plugins/manga/
   const manualEntries = fs.readdirSync(PLUGINS_MANGA_DIR, { withFileTypes: true });
   for (const entry of manualEntries) {
     if (!entry.isDirectory()) continue;
@@ -219,7 +255,6 @@ async function main() {
     }
   }
 
-  // Sort manifests: Verified first, then Popular, then alphabetical
   convertedManifests.sort((a, b) => {
     const aVerified = a.badges?.includes('Verified') ? 1 : 0;
     const bVerified = b.badges?.includes('Verified') ? 1 : 0;
@@ -246,16 +281,16 @@ async function main() {
   const repoJsonPath = path.join(DIST_MANGA_DIR, 'repo.json');
   fs.writeFileSync(repoJsonPath, JSON.stringify(fullRepoManifest, null, 2), 'utf-8');
 
-  console.log('\n========================================');
-  console.log(`🎉 Upstream Sync & Conversion Complete!`);
-  console.log(`   - Converted & Verified: ${successCount} sources`);
-  console.log(`   - Skipped / Failed:     ${skippedCount} sources`);
-  console.log(`   - Total in repo.json:   ${convertedManifests.length} plugins`);
-  console.log(`   - Output Manifest:      ${repoJsonPath}`);
-  console.log('========================================\n');
+  console.log('========================================');
+  console.log('Upstream Sync and Conversion Complete');
+  console.log(`   - Converted and verified: ${successCount} sources`);
+  console.log(`   - Skipped or failed:      ${skippedCount} sources`);
+  console.log(`   - Total in repo.json:     ${convertedManifests.length} plugins`);
+  console.log(`   - Output manifest:        ${repoJsonPath}`);
+  console.log('========================================');
 }
 
 main().catch((err) => {
-  console.error('\n❌ Conversion pipeline failed:', err);
+  console.error('Conversion pipeline failed:', err);
   process.exit(1);
 });

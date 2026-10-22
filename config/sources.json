@@ -5,6 +5,13 @@
     "versioningUrl": "https://raw.githubusercontent.com/inkdex/extensions/master/0.9/stable/versioning.json",
     "rawBaseUrl": "https://raw.githubusercontent.com/inkdex/extensions/master/0.9/stable"
   },
+  "extraUpstreams": [
+    {
+      "name": "PoppingMangoSources/general-extensions-mangago",
+      "versioningUrl": "https://raw.githubusercontent.com/PoppingMangoSources/general-extensions-mangago/gh-pages/0.9/test/versioning.json",
+      "rawBaseUrl": "https://raw.githubusercontent.com/PoppingMangoSources/general-extensions-mangago/gh-pages/0.9/test"
+    }
+  ],
   "syncMode": "all",
   "popular": [
     "WeebCentral",
