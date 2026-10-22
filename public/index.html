@@ -1,251 +1,235 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Harbor Plugins Repository</title>
-  <link rel="stylesheet" href="style.css" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22%20width=%22100%22%20height=%22100%22><text y=%22.9em%22 font-size=%2290%22>⚓</text></svg>" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>giinyu's harbor repo</title>
+<link rel="icon" href="https://storage.ko-fi.com/cdn/useruploads/post/4577af25-8a01-4cdf-ae95-9093ea50fdc1_neobun.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div class="logo-badge">⚓ Harbor Extensions</div>
-      <h1>Harbor Plugins Repository</h1>
-      <p class="subtitle">
-        High quality, fast, and optimized source plugins for Manga & eBooks in Harbor reader.
-      </p>
-    </header>
+<div class="container">
 
-    <main>
-      <!-- Dual Repo URLs -->
-      <section class="repo-grid">
-        <!-- Manga Repo Card -->
-        <div class="repo-card" id="card-manga">
-          <div class="card-header">
-            <span class="repo-type-tag tag-manga">Manga</span>
-          </div>
-          <h2>Manga Repository</h2>
-          <p class="card-desc">
-            Community-driven manga source plugins compatible with Harbor's Manga engine.
-          </p>
-          <div class="url-box">
-            <code id="url-manga">Loading...</code>
-            <button class="btn-copy" onclick="copyUrl('url-manga', this)">Copy URL</button>
-          </div>
-          <div class="instructions">
-            <strong>How to add:</strong> In Harbor, go to <em>Manga</em> → <em>Set up a source</em> → <em>Extensions</em> → paste this URL.
-          </div>
-        </div>
-
-        <!-- eBook Repo Card -->
-        <div class="repo-card" id="card-ebook">
-          <div class="card-header">
-            <span class="repo-type-tag tag-ebook">eBook</span>
-          </div>
-          <h2>eBook Repository</h2>
-          <p class="card-desc">
-            Novel and eBook source plugins with support for volume grouping and typography.
-          </p>
-          <div class="url-box">
-            <code id="url-ebook">Loading...</code>
-            <button class="btn-copy" onclick="copyUrl('url-ebook', this)">Copy URL</button>
-          </div>
-          <div class="instructions">
-            <strong>How to add:</strong> In Harbor, go to <em>eBook</em> → <em>Sources</em> → <em>Extensions</em> → paste this URL.
-          </div>
-        </div>
-      </section>
-
-      <!-- Active Catalog -->
-      <section>
-        <h2 class="section-title">Available Plugins</h2>
-        <div class="catalog-controls">
-          <input
-            type="text"
-            id="search-box"
-            class="search-input"
-            placeholder="🔍 Search plugins by name, ID, or description (e.g. WeebCentral, MangaDex, Solo Leveling)..."
-            oninput="handleSearch(this.value)"
-          />
-          <div class="filter-chips">
-            <button class="chip-btn active" onclick="setFilter('all', this)">All</button>
-            <button class="chip-btn" onclick="setFilter('operational', this)">🟢 Tested & Working</button>
-            <button class="chip-btn" onclick="setFilter('verified', this)">✔️ Verified</button>
-            <button class="chip-btn" onclick="setFilter('popular', this)">⭐ Popular</button>
-            <button class="chip-btn" onclick="setFilter('manga', this)">Manga</button>
-            <button class="chip-btn" onclick="setFilter('ebook', this)">eBook</button>
-            <button class="chip-btn" onclick="setFilter('safe', this)">Safe (Non-NSFW)</button>
-            <button class="chip-btn" onclick="setFilter('nsfw', this)">🔞 18+</button>
-          </div>
-        </div>
-        <div class="catalog-stats" id="catalog-stats">Loading sources...</div>
-        <div class="plugin-list" id="plugin-container">
-          <div style="color: var(--text-secondary); font-size: 0.9rem;">Loading available sources...</div>
-        </div>
-      </section>
-    </main>
-
-    <footer>
-      <p>
-        Built with TypeScript & esbuild. Fully compliant with the Harbor sandboxed Web Worker specification.
-      </p>
-    </footer>
+  <div class="hero">
+    <div class="hero-label">PLUGIN REPOSITORY &middot; HARBOR READER</div>
+    <h1>GIINYU'S<br><span>HARBOR</span> REPO</h1>
+    <p class="hero-desc">
+      Hand-picked source plugins for manga and eBooks in the Harbor reader.
+      Copy a repo URL below, paste it into <code>Extensions</code>, done.
+    </p>
   </div>
 
-  <script>
-    function getRepoUrl(subpath) {
-      const base = window.location.origin + window.location.pathname.replace(/\/+$/, '');
-      return `${base}/${subpath}/repo.json`;
-    }
-
-    const mangaUrl = getRepoUrl('manga');
-    const ebookUrl = getRepoUrl('ebook');
-
-    document.getElementById('url-manga').textContent = mangaUrl;
-    document.getElementById('url-ebook').textContent = ebookUrl;
-
-    async function copyUrl(elementId, button) {
-      const text = document.getElementById(elementId).textContent;
-      try {
-        await navigator.clipboard.writeText(text);
-        const originalText = button.textContent;
-        button.textContent = 'Copied!';
-        button.classList.add('copied');
-        setTimeout(() => {
-          button.textContent = originalText;
-          button.classList.remove('copied');
-        }, 2000);
-      } catch (err) {
-        console.error('Failed to copy', err);
-      }
-    }
-
-    let allPlugins = [];
-    let healthReports = {};
-    let currentFilter = 'all';
-    let searchQuery = '';
-
-    function renderCatalog() {
-      const container = document.getElementById('plugin-container');
-      const stats = document.getElementById('catalog-stats');
-
-      const filtered = allPlugins.filter(p => {
-        // Text search
-        if (searchQuery) {
-          const q = searchQuery.toLowerCase();
-          const matchesName = (p.name || '').toLowerCase().includes(q);
-          const matchesId = (p.id || '').toLowerCase().includes(q);
-          const matchesDesc = (p.description || '').toLowerCase().includes(q);
-          if (!matchesName && !matchesId && !matchesDesc) return false;
-        }
-
-        // Chip filter
-        if (currentFilter === 'operational') {
-          const h = healthReports[p.id];
-          return h && h.overallStatus === 'OPERATIONAL';
-        }
-        if (currentFilter === 'verified') return (p.badges || []).includes('Verified');
-        if (currentFilter === 'popular') return (p.badges || []).includes('Popular');
-        if (currentFilter === 'manga') return p.type === 'manga';
-        if (currentFilter === 'ebook') return p.type === 'ebook';
-        if (currentFilter === 'safe') return !p.nsfw;
-        if (currentFilter === 'nsfw') return p.nsfw;
-
-        return true;
-      });
-
-      stats.textContent = `Showing ${filtered.length} of ${allPlugins.length} sources`;
-
-      if (filtered.length === 0) {
-        container.innerHTML = '<div style="color: var(--text-secondary);">No matching plugins found.</div>';
-        return;
-      }
-
-      container.innerHTML = filtered.map(p => {
-        const isVerified = (p.badges || []).includes('Verified');
-        const isPopular = (p.badges || []).includes('Popular');
-        const health = healthReports[p.id];
-
-        let healthBadge = '';
-        if (health) {
-          if (health.overallStatus === 'OPERATIONAL') {
-            healthBadge = `<span class="badge badge-verified" title="Passed ${health.endpointsPassed}/${health.totalEndpoints} Harbor endpoints (${health.totalLatencyMs}ms)">🟢 Working (${health.endpointsPassed}/${health.totalEndpoints})</span>`;
-          } else if (health.overallStatus === 'CLOUDFLARE_BLOCKED') {
-            healthBadge = `<span class="badge badge-popular" title="Cloudflare Turnstile challenge detected">🔒 CF Challenge</span>`;
-          } else if (health.overallStatus === 'PARTIAL') {
-            healthBadge = `<span class="badge badge-popular" title="Partial support">🟡 Partial</span>`;
-          } else {
-            healthBadge = `<span class="badge" style="background: rgba(248, 81, 73, 0.15); color: #f85149;" title="${health.notes || 'Offline'}">🔴 Offline</span>`;
-          }
-        }
-
-        return `
-          <div class="plugin-item">
-            <div class="plugin-item-header">
-              <h3>${p.name}</h3>
-              <span class="plugin-version">v${p.version}</span>
-            </div>
-            <p>${p.description || 'No description provided.'}</p>
-            <div class="badges">
-              <span class="badge ${p.type === 'manga' ? 'tag-manga' : 'tag-ebook'}">${p.type}</span>
-              <span class="badge badge-lang">${p.lang || 'en'}</span>
-              ${healthBadge}
-              ${isVerified ? '<span class="badge badge-verified">✔️ Verified</span>' : ''}
-              ${isPopular ? '<span class="badge badge-popular">⭐ Popular</span>' : ''}
-              ${p.nsfw ? '<span class="badge badge-nsfw">🔞 18+</span>' : ''}
-            </div>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">ADD TO HARBOR</span>
+      <span class="card-number">01 / 02</span>
+    </div>
+    <div class="card-body">
+      <div class="repo-grid">
+        <div class="repo-box">
+          <div class="repo-name">Manga <span class="badge tag-manga">repo</span></div>
+          <p class="repo-desc">Manga, manhwa and manhua sources for Harbor's manga engine.</p>
+          <div class="url-box">
+            <code id="url-manga">Loading...</code>
+            <button class="btn" onclick="copyUrl('url-manga', this)">COPY</button>
           </div>
-        `;
-      }).join('');
+        </div>
+        <div class="repo-box">
+          <div class="repo-name">eBook <span class="badge tag-ebook">repo</span></div>
+          <p class="repo-desc">Novel and eBook sources with volume grouping and typography support.</p>
+          <div class="url-box">
+            <code id="url-ebook">Loading...</code>
+            <button class="btn" onclick="copyUrl('url-ebook', this)">COPY</button>
+          </div>
+        </div>
+      </div>
+      <ul class="steps-list">
+        <li class="step-item"><span class="step-num">1</span><span><strong>Manga:</strong> Harbor &rarr; Manga &rarr; Set up a source &rarr; Extensions &rarr; paste the manga URL.</span></li>
+        <li class="step-item"><span class="step-num">2</span><span><strong>eBook:</strong> Harbor &rarr; eBook &rarr; Sources &rarr; Extensions &rarr; paste the eBook URL.</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">AVAILABLE SOURCES</span>
+      <span class="card-number">02 / 02</span>
+    </div>
+    <div class="card-body">
+      <input type="text" id="search-box" class="search-input" placeholder="search by name, id or description" oninput="handleSearch(this.value)">
+      <div class="filter-chips">
+        <button class="chip-btn active" onclick="setFilter('all', this)">All</button>
+        <button class="chip-btn" onclick="setFilter('operational', this)">Working</button>
+        <button class="chip-btn" onclick="setFilter('verified', this)">Verified</button>
+        <button class="chip-btn" onclick="setFilter('popular', this)">Popular</button>
+        <button class="chip-btn" onclick="setFilter('manga', this)">Manga</button>
+        <button class="chip-btn" onclick="setFilter('ebook', this)">eBook</button>
+        <button class="chip-btn" onclick="setFilter('safe', this)">Safe</button>
+        <button class="chip-btn" onclick="setFilter('nsfw', this)">18+</button>
+      </div>
+      <div class="catalog-stats" id="catalog-stats">LOADING SOURCES...</div>
+      <div class="plugin-list" id="plugin-container"><div class="empty">Loading available sources...</div></div>
+    </div>
+  </div>
+
+</div>
+
+<footer class="site-footer">
+  <div class="footer-left">
+    <img class="footer-avatar" src="https://storage.ko-fi.com/cdn/useruploads/post/4577af25-8a01-4cdf-ae95-9093ea50fdc1_neobun.png" alt="G1NYU">
+    <div>
+      <div class="footer-handle">G1NYU</div>
+      <div class="footer-links">
+        <a class="footer-link" href="https://github.com/G1NYU" target="_blank" rel="noopener">GitHub</a>
+        <a class="footer-link" href="https://anilist.co/user/G1NYU/" target="_blank" rel="noopener">AniList</a>
+        <a class="footer-link" href="https://github.com/G1NYU/harbor-plugins" target="_blank" rel="noopener">Source</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-note">Plugins run sandboxed inside Harbor. Availability depends on each source site.</div>
+</footer>
+
+<script>
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function getRepoUrl(subpath) {
+    const path = window.location.pathname.endsWith('/') ? window.location.pathname.slice(0, -1) : window.location.pathname;
+    return window.location.origin + path + '/' + subpath + '/repo.json';
+  }
+
+  document.getElementById('url-manga').textContent = getRepoUrl('manga');
+  document.getElementById('url-ebook').textContent = getRepoUrl('ebook');
+
+  async function copyUrl(elementId, button) {
+    const text = document.getElementById(elementId).textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      const original = button.textContent;
+      button.textContent = 'COPIED';
+      button.classList.add('copied');
+      setTimeout(() => {
+        button.textContent = original;
+        button.classList.remove('copied');
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy', err);
+    }
+  }
+
+  let allPlugins = [];
+  let healthReports = {};
+  let currentFilter = 'all';
+  let searchQuery = '';
+
+  function renderCatalog() {
+    const container = document.getElementById('plugin-container');
+    const stats = document.getElementById('catalog-stats');
+
+    const filtered = allPlugins.filter((p) => {
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const hit = (p.name || '').toLowerCase().includes(q) || (p.id || '').toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q);
+        if (!hit) return false;
+      }
+      if (currentFilter === 'operational') {
+        const h = healthReports[p.id];
+        return h && h.overallStatus === 'OPERATIONAL';
+      }
+      if (currentFilter === 'verified') return (p.badges || []).includes('Verified');
+      if (currentFilter === 'popular') return (p.badges || []).includes('Popular');
+      if (currentFilter === 'manga') return p.type === 'manga';
+      if (currentFilter === 'ebook') return p.type === 'ebook';
+      if (currentFilter === 'safe') return !p.nsfw;
+      if (currentFilter === 'nsfw') return p.nsfw;
+      return true;
+    });
+
+    stats.textContent = 'SHOWING ' + filtered.length + ' / ' + allPlugins.length + ' SOURCES';
+
+    if (filtered.length === 0) {
+      container.innerHTML = '<div class="empty">No matching plugins found.</div>';
+      return;
     }
 
-    function handleSearch(val) {
-      searchQuery = val.trim();
-      renderCatalog();
-    }
+    container.innerHTML = filtered.map((p) => {
+      const isVerified = (p.badges || []).includes('Verified');
+      const isPopular = (p.badges || []).includes('Popular');
+      const health = healthReports[p.id];
 
-    function setFilter(filter, button) {
-      currentFilter = filter;
-      document.querySelectorAll('.chip-btn').forEach(btn => btn.classList.remove('active'));
-      button.classList.add('active');
-      renderCatalog();
-    }
-
-    async function loadCatalog() {
-      allPlugins = [];
-      healthReports = {};
-
-      try {
-        const repRes = await fetch('./test-report.json');
-        if (repRes.ok) {
-          const list = await repRes.json();
-          for (const item of list) {
-            healthReports[item.id] = item;
-          }
+      let healthBadge = '';
+      if (health) {
+        if (health.overallStatus === 'OPERATIONAL') {
+          healthBadge = '<span class="badge badge-verified" title="Passed ' + esc(health.endpointsPassed) + '/' + esc(health.totalEndpoints) + ' Harbor endpoints (' + esc(health.totalLatencyMs) + 'ms)">Working ' + esc(health.endpointsPassed) + '/' + esc(health.totalEndpoints) + '</span>';
+        } else if (health.overallStatus === 'CLOUDFLARE_BLOCKED') {
+          healthBadge = '<span class="badge badge-warn" title="Cloudflare challenge detected">CF challenge</span>';
+        } else if (health.overallStatus === 'PARTIAL') {
+          healthBadge = '<span class="badge badge-warn" title="Partial support">Partial</span>';
+        } else {
+          healthBadge = '<span class="badge badge-bad" title="' + esc(health.notes || 'Offline') + '">Offline</span>';
         }
-      } catch (_) {}
+      }
 
-      try {
-        const mangaRes = await fetch('./manga/repo.json');
-        if (mangaRes.ok) {
-          const mangaData = await mangaRes.json();
-          (mangaData.plugins || []).forEach(p => allPlugins.push({ ...p, type: 'manga' }));
-        }
-      } catch (_) {}
+      return '<div class="plugin-item">' +
+        '<div class="plugin-item-header"><h3>' + esc(p.name) + '</h3><span class="plugin-version">v' + esc(p.version) + '</span></div>' +
+        '<p>' + esc(p.description || 'No description provided.') + '</p>' +
+        '<div class="badges">' +
+          '<span class="badge ' + (p.type === 'manga' ? 'tag-manga' : 'tag-ebook') + '">' + esc(p.type) + '</span>' +
+          '<span class="badge">' + esc(p.lang || 'en') + '</span>' +
+          healthBadge +
+          (isVerified ? '<span class="badge badge-verified">Verified</span>' : '') +
+          (isPopular ? '<span class="badge badge-popular">Popular</span>' : '') +
+          (p.nsfw ? '<span class="badge badge-nsfw">18+</span>' : '') +
+        '</div></div>';
+    }).join('');
+  }
 
-      try {
-        const ebookRes = await fetch('./ebook/repo.json');
-        if (ebookRes.ok) {
-          const ebookData = await ebookRes.json();
-          (ebookData.plugins || []).forEach(p => allPlugins.push({ ...p, type: 'ebook' }));
-        }
-      } catch (_) {}
+  function handleSearch(val) {
+    searchQuery = val.trim();
+    renderCatalog();
+  }
 
-      renderCatalog();
-    }
+  function setFilter(filter, button) {
+    currentFilter = filter;
+    document.querySelectorAll('.chip-btn').forEach((b) => b.classList.remove('active'));
+    button.classList.add('active');
+    renderCatalog();
+  }
 
-    loadCatalog();
-  </script>
+  async function loadCatalog() {
+    allPlugins = [];
+    healthReports = {};
+
+    try {
+      const res = await fetch('./test-report.json');
+      if (res.ok) {
+        const list = await res.json();
+        for (const item of list) healthReports[item.id] = item;
+      }
+    } catch (_) {}
+
+    try {
+      const res = await fetch('./manga/repo.json');
+      if (res.ok) {
+        const data = await res.json();
+        (data.plugins || []).forEach((p) => allPlugins.push({ ...p, type: 'manga' }));
+      }
+    } catch (_) {}
+
+    try {
+      const res = await fetch('./ebook/repo.json');
+      if (res.ok) {
+        const data = await res.json();
+        (data.plugins || []).forEach((p) => allPlugins.push({ ...p, type: 'ebook' }));
+      }
+    } catch (_) {}
+
+    renderCatalog();
+  }
+
+  loadCatalog();
+</script>
 </body>
 </html>
