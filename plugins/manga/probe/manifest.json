@@ -1,9 +1,1 @@
-{
-  "id": "probe7",
-  "name": "Probe7 Legion v0.0.4 (diag)",
-  "version": "0.0.4",
-  "lang": "es",
-  "nsfw": false,
-  "entry": "probe7.plugin.js",
-  "description": "Diagnostic: loads legionscans.com/wp/manga/, follows the first /wp/manga/<slug>/ series page to a dated chapter post and one page image, printing short status rows"
-}
+PLACEHOLDER_SEE_PLACEHOLDER_TEXT
