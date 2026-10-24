@@ -1,9 +1,9 @@
 {
-  "id": "probe4",
-  "name": "Probe4 Legion v0.0.1 (diag)",
-  "version": "0.0.1",
+  "id": "probe5",
+  "name": "Probe5 Legion v0.0.2 (diag)",
+  "version": "0.0.2",
   "lang": "es",
   "nsfw": false,
-  "entry": "probe4.plugin.js",
-  "description": "Diagnostic: loads legionscans.com from inside Harbor, then requests one cover, one series page, one chapter page and one chapter image with plain requests, and prints short status rows"
+  "entry": "probe5.plugin.js",
+  "description": "Diagnostic: loads legionscans.com, lists the first internal links and image hosts, tests three images, then follows the first series link to a chapter and one page image, printing short status rows"
 }

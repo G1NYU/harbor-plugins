@@ -49,46 +49,106 @@ function host(u: string): string {
   return m ? m[1] : '?';
 }
 
-async function run(): Promise<MangaSummary[]> {
-  const out: string[] = ['PROBE4 v0.0.1 legion'];
-  const home = await step('HOME /', BASE + '/', out);
-  const wp = await step('HOME /wp/', BASE + '/wp/', out);
-  const html = home || wp;
-  if (!html) return rows(out.concat('NO HOME PAGE, stop'));
+function toAbs(u: string): string {
+  if (u.indexOf('//') === 0) return 'https:' + u;
+  if (u.charAt(0) === '/') return BASE + u;
+  return u;
+}
 
-  const sm = /href="(https?:\/\/legionscans\.com[^"]*\/series\/[^"#]+)"/i.exec(html);
-  out.push('series link: ' + (sm ? 'yes' : 'NO'));
-  const cm = /<img[^>]+src="(https?:\/\/[^"]+\.(?:jpe?g|png|webp)[^"]*)"/i.exec(html);
-  if (cm) {
-    out.push('cover host:');
-    out.push(host(cm[1]));
-    await step('COVER', cm[1], out);
-  } else {
-    out.push('cover: none found');
+function pathOf(u: string): string {
+  return u.replace(BASE, '') || '/';
+}
+
+function internalLinks(html: string): string[] {
+  const re = /href="([^"#]+)"/gi;
+  const seen: Record<string, boolean> = {};
+  const out: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const u = toAbs(m[1].replace(/&amp;/g, '&'));
+    if (u.indexOf(BASE) !== 0) continue;
+    const p = pathOf(u);
+    if (p === '/' || p === '') continue;
+    if (/\.(css|js|png|jpe?g|webp|svg|ico|xml|json|gif)(\?|$)/i.test(p)) continue;
+    if (/wp-(content|json|admin|includes)|\/feed|xmlrpc/i.test(p)) continue;
+    if (seen[u]) continue;
+    seen[u] = true;
+    out.push(u);
   }
-  if (!sm) return rows(out);
+  return out;
+}
 
-  const sp = await step('SERIES pg', sm[1], out);
+function imageUrls(html: string): string[] {
+  const re = /<img[^>]+?(?:data-src|src)="(https?:\/\/[^"]+)"/gi;
+  const seen: Record<string, boolean> = {};
+  const out: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    if (seen[m[1]]) continue;
+    seen[m[1]] = true;
+    out.push(m[1]);
+  }
+  return out;
+}
+
+async function run(): Promise<MangaSummary[]> {
+  const out: string[] = ['PROBE5 v0.0.2 legion'];
+  const home = await step('HOME /', BASE + '/', out);
+  if (!home) return rows(out.concat('NO HOME PAGE, stop'));
+
+  const links = internalLinks(home);
+  out.push('internal links: ' + links.length);
+  for (let i = 0; i < links.length && i < 4; i++) out.push('L' + (i + 1) + ' ' + pathOf(links[i]));
+
+  const imgs = imageUrls(home);
+  out.push('images: ' + imgs.length);
+  for (let i = 0; i < imgs.length && i < 3; i++) {
+    out.push('I' + (i + 1) + ' ' + host(imgs[i]));
+    await step('IMG' + (i + 1), imgs[i], out);
+  }
+
+  const cands = links.filter((u) => {
+    const p = pathOf(u);
+    return p.split('/').filter(Boolean).length >= 2 && !/\/(page|category|tag|author|genre|genres)\//i.test(p);
+  });
+  if (cands.length === 0) return rows(out.concat('no series candidate'));
+  out.push('series cand:');
+  out.push(pathOf(cands[0]));
+
+  const sp = await step('SERIES pg', cands[0], out);
   if (!sp) return rows(out);
-  const n = (sp.match(/eph-num/g) || []).length;
-  out.push('chapter links: ' + n);
-  const chm = /class="eph-num">\s*<a[^>]+href="([^"]+)"/i.exec(sp);
-  if (!chm) return rows(out);
+  out.push('eph-num: ' + (sp.match(/eph-num/g) || []).length);
+  out.push('data-num: ' + (sp.match(/data-num=/g) || []).length);
+  let chUrl = '';
+  const c1 = /class="eph-num">\s*<a[^>]+href="([^"]+)"/i.exec(sp);
+  const c2 = /href="([^"]*(?:chapter|capitulo)[^"]*)"/i.exec(sp);
+  if (c1) chUrl = toAbs(c1[1]);
+  else if (c2) chUrl = toAbs(c2[1]);
+  if (!chUrl) return rows(out.concat('no chapter link'));
+  out.push('chapter:');
+  out.push(pathOf(chUrl));
 
-  const ch = await step('CHAPTER pg', chm[1], out);
+  const ch = await step('CHAPTER pg', chUrl, out);
   if (!ch) return rows(out);
-  const im = /"sources":\s*\[[\s\S]*?"images":\s*\[\s*"([^"]+)"/.exec(ch.replace(/\\\//g, '/'));
-  if (!im) return rows(out.concat('sources JSON: NOT FOUND'));
+  const flat = ch.replace(/\\\//g, '/');
+  out.push('readerarea: ' + (flat.indexOf('readerarea') >= 0 ? 'yes' : 'NO'));
+  let pageImg = '';
+  const s1 = /"sources":\s*\[[\s\S]*?"images":\s*\[\s*"([^"]+)"/.exec(flat);
+  const s2 = /id="readerarea"[\s\S]*?<img[^>]+?(?:data-src|src)="(https?:[^"]+)"/i.exec(flat);
+  out.push('sources json: ' + (s1 ? 'yes' : 'NO'));
+  if (s1) pageImg = s1[1];
+  else if (s2) pageImg = s2[1];
+  if (!pageImg) return rows(out.concat('no page image found'));
   out.push('page img host:');
-  out.push(host(im[1]));
-  await step('PAGE IMG', im[1], out);
+  out.push(host(pageImg));
+  await step('PAGE IMG', pageImg, out);
   out.push('DONE');
   return rows(out);
 }
 
 const plugin: MangaProvider = {
-  id: 'probe4',
-  name: 'Probe4 Legion v0.0.1 (diag)',
+  id: 'probe5',
+  name: 'Probe5 Legion v0.0.2 (diag)',
 
   async popular(offset: number) {
     if (offset > 0) return [];
