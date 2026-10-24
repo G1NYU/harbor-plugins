@@ -1,1 +1,262 @@
-PLACEHOLDER_SEE_PLACEHOLDER_TEXT
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>giinyu's harbor repo</title>
+<link rel="icon" href="https://storage.ko-fi.com/cdn/useruploads/post/4577af25-8a01-4cdf-ae95-9093ea50fdc1_neobun.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+
+  <div class="hero">
+    <div class="hero-label">PLUGIN REPOSITORY &middot; HARBOR READER</div>
+    <h1>GIINYU'S<br><span>HARBOR</span> REPO</h1>
+    <p class="hero-desc">
+      Hand-picked source plugins for manga and eBooks in the Harbor reader.
+      Copy a repo URL below, paste it into <code>Extensions</code>, done.
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">ADD TO HARBOR</span>
+      <span class="card-number">01 / 03</span>
+    </div>
+    <div class="card-body">
+      <div class="repo-grid">
+        <div class="repo-box">
+          <div class="repo-name">Manga <span class="badge tag-manga">repo</span></div>
+          <p class="repo-desc">Manga, manhwa and manhua sources for Harbor's manga engine.</p>
+          <div class="url-box">
+            <code id="url-manga">Loading...</code>
+            <button class="btn" onclick="copyUrl('url-manga', this)">COPY</button>
+          </div>
+        </div>
+        <div class="repo-box">
+          <div class="repo-name">eBook <span class="badge tag-ebook">repo</span></div>
+          <p class="repo-desc">Novel and eBook sources with volume grouping and typography support.</p>
+          <div class="url-box">
+            <code id="url-ebook">Loading...</code>
+            <button class="btn" onclick="copyUrl('url-ebook', this)">COPY</button>
+          </div>
+        </div>
+      </div>
+      <div class="repo-box" style="margin-top:1rem">
+        <div class="repo-name">Manga Extended <span class="badge badge-warn">optional</span></div>
+        <p class="repo-desc">Everything in the Manga repo plus BatCave and Royal Road. These may show a Cloudflare popup in Harbor, and BatCave often still fails to load afterwards. Use this one instead of the Manga repo, not alongside it.</p>
+        <div class="url-box">
+          <code id="url-extended">Loading...</code>
+          <button class="btn" onclick="copyUrl('url-extended', this)">COPY</button>
+        </div>
+      </div>
+      <ul class="steps-list">
+        <li class="step-item"><span class="step-num">1</span><span><strong>Manga:</strong> Harbor &rarr; Manga &rarr; Set up a source &rarr; Extensions &rarr; paste the manga URL.</span></li>
+        <li class="step-item"><span class="step-num">2</span><span><strong>eBook:</strong> Harbor &rarr; eBook &rarr; Sources &rarr; Extensions &rarr; paste the eBook URL.</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">AVAILABLE SOURCES</span>
+      <span class="card-number">02 / 03</span>
+    </div>
+    <div class="card-body">
+      <input type="text" id="search-box" class="search-input" placeholder="search by name, id or description" oninput="handleSearch(this.value)">
+      <div class="filter-chips">
+        <button class="chip-btn active" onclick="setFilter('all', this)">All</button>
+        <button class="chip-btn" onclick="setFilter('operational', this)">Working</button>
+        <button class="chip-btn" onclick="setFilter('verified', this)">Verified</button>
+        <button class="chip-btn" onclick="setFilter('popular', this)">Popular</button>
+        <button class="chip-btn" onclick="setFilter('manga', this)">Manga</button>
+        <button class="chip-btn" onclick="setFilter('ebook', this)">eBook</button>
+        <button class="chip-btn" onclick="setFilter('safe', this)">Safe</button>
+        <button class="chip-btn" onclick="setFilter('nsfw', this)">18+</button>
+      </div>
+      <div class="catalog-stats" id="catalog-stats">LOADING SOURCES...</div>
+      <div class="plugin-list" id="plugin-container"><div class="empty">Loading available sources...</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">KNOWN ISSUES</span>
+      <span class="card-number">03 / 03</span>
+    </div>
+    <div class="card-body">
+      <ul class="steps-list" style="margin-top:0">
+        <li class="step-item"><span class="step-num">+</span><span><strong>New (24 Oct 2026):</strong> &#9733; Asura Scans is now in the main Manga repo, pinned at the top. It took many attempts to get working in Harbor. Legion Scans (Spanish) was added right below it. Atsumaru, Hijala, ManhwaNex, Thunderscans, MangaKatana, MangaDemon and VortexScans were added the same day.</span></li>
+        <li class="step-item"><span class="step-num">!</span><span><strong>Legion Scans:</strong> browse shows the first page of the catalogue only (31 series), and search has not been tested yet.</span></li>
+        <li class="step-item"><span class="step-num">!</span><span><strong>No covers:</strong> Atsumaru shows series without cover images. Series pages, chapters and reader pages load fine. This looks like a Harbor-side issue and has been reported to Harbor's developers.</span></li>
+        <li class="step-item"><span class="step-num">!</span><span><strong>Mixed chapter sources:</strong> some of the sites VortexScans pulls from (for example NovelBuddy) can show "this chapter could not be loaded from this source". MangaDemon lists chapters from several sites, and only some of them open.</span></li>
+        <li class="step-item"><span class="step-num">!</span><span><strong>Cloudflare sites:</strong> BatCave and Royal Road are in the Manga Extended repo. Sites behind a Cloudflare check open Harbor's check window, but the source can still fail to load afterwards, because Harbor does not pass the cleared cookie on to the plugin's own requests. BatCave is the clearest case.</span></li>
+        <li class="step-item"><span class="step-num">&times;</span><span><strong>Not published:</strong> Kagane (needs a Cloudflare proxy and a browser-only chapter check), Mangasushi, and MangaBuddy (its image host refuses requests without a site Referer, which Harbor cannot send).</span></li>
+        <li class="step-item"><span class="step-num">&times;</span><span><strong>Removed:</strong> MangaFire, MangaTown and Mangapill. Mangapill worked, but its series covers did not show in Harbor.</span></li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+
+<footer class="site-footer">
+  <div class="footer-left">
+    <img class="footer-avatar" src="https://storage.ko-fi.com/cdn/useruploads/post/4577af25-8a01-4cdf-ae95-9093ea50fdc1_neobun.png" alt="G1NYU">
+    <div>
+      <div class="footer-handle">G1NYU</div>
+      <div class="footer-links">
+        <a class="footer-link" href="https://github.com/G1NYU" target="_blank" rel="noopener">GitHub</a>
+        <a class="footer-link" href="https://anilist.co/user/G1NYU/" target="_blank" rel="noopener">AniList</a>
+        <a class="footer-link" href="https://github.com/G1NYU/harbor-plugins" target="_blank" rel="noopener">Source</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-note">Plugins run sandboxed inside Harbor. Availability depends on each source site.</div>
+</footer>
+
+<script>
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>\"]/g, (c) => ({ '&': '&', '<': '<', '>': '>', '"': '"' }[c]));
+
+  function getRepoUrl(subpath, file) {
+    const path = window.location.pathname.endsWith('/') ? window.location.pathname.slice(0, -1) : window.location.pathname;
+    return window.location.origin + path + '/' + subpath + '/' + (file || 'repo.json');
+  }
+
+  document.getElementById('url-manga').textContent = getRepoUrl('manga');
+  document.getElementById('url-ebook').textContent = getRepoUrl('ebook');
+  document.getElementById('url-extended').textContent = getRepoUrl('manga', 'repo-extended.json');
+
+  async function copyUrl(elementId, button) {
+    const text = document.getElementById(elementId).textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      const original = button.textContent;
+      button.textContent = 'COPIED';
+      button.classList.add('copied');
+      setTimeout(() => {
+        button.textContent = original;
+        button.classList.remove('copied');
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy', err);
+    }
+  }
+
+  let allPlugins = [];
+  let healthReports = {};
+  let currentFilter = 'all';
+  let searchQuery = '';
+
+  function renderCatalog() {
+    const container = document.getElementById('plugin-container');
+    const stats = document.getElementById('catalog-stats');
+
+    const filtered = allPlugins.filter((p) => {
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const hit = (p.name || '').toLowerCase().includes(q) || (p.id || '').toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q);
+        if (!hit) return false;
+      }
+      if (currentFilter === 'operational') {
+        const h = healthReports[p.id];
+        return h && h.overallStatus === 'OPERATIONAL';
+      }
+      if (currentFilter === 'verified') return (p.badges || []).includes('Verified');
+      if (currentFilter === 'popular') return (p.badges || []).includes('Popular');
+      if (currentFilter === 'manga') return p.type === 'manga';
+      if (currentFilter === 'ebook') return p.type === 'ebook';
+      if (currentFilter === 'safe') return !p.nsfw;
+      if (currentFilter === 'nsfw') return p.nsfw;
+      return true;
+    });
+
+    stats.textContent = 'SHOWING ' + filtered.length + ' / ' + allPlugins.length + ' SOURCES';
+
+    if (filtered.length === 0) {
+      container.innerHTML = '<div class="empty">No matching plugins found.</div>';
+      return;
+    }
+
+    container.innerHTML = filtered.map((p) => {
+      const isVerified = (p.badges || []).includes('Verified');
+      const isPopular = (p.badges || []).includes('Popular');
+      const health = healthReports[p.id];
+
+      let healthBadge = '';
+      if (health) {
+        if (health.overallStatus === 'OPERATIONAL') {
+          healthBadge = '<span class="badge badge-verified" title="Passed ' + esc(health.endpointsPassed) + '/' + esc(health.totalEndpoints) + ' Harbor endpoints (' + esc(health.totalLatencyMs) + 'ms)">Working ' + esc(health.endpointsPassed) + '/' + esc(health.totalEndpoints) + '</span>';
+        } else if (health.overallStatus === 'CLOUDFLARE_BLOCKED') {
+          healthBadge = '<span class="badge badge-warn" title="Cloudflare challenge detected">CF challenge</span>';
+        } else if (health.overallStatus === 'PARTIAL') {
+          healthBadge = '<span class="badge badge-warn" title="Partial support">Partial</span>';
+        } else {
+          healthBadge = '<span class="badge badge-bad" title="' + esc(health.notes || 'Offline') + '">Offline</span>';
+        }
+      }
+
+      return '<div class="plugin-item">' +
+        '<div class="plugin-item-header"><h3>' + esc(p.name) + '</h3><span class="plugin-version">v' + esc(p.version) + '</span></div>' +
+        '<p>' + esc(p.description || 'No description provided.') + '</p>' +
+        '<div class="badges">' +
+          '<span class="badge ' + (p.type === 'manga' ? 'tag-manga' : 'tag-ebook') + '">' + esc(p.type) + '</span>' +
+          '<span class="badge">' + esc(p.lang || 'en') + '</span>' +
+          healthBadge +
+          (isVerified ? '<span class="badge badge-verified">Verified</span>' : '') +
+          (isPopular ? '<span class="badge badge-popular">Popular</span>' : '') +
+          (p.nsfw ? '<span class="badge badge-nsfw">18+</span>' : '') +
+        '</div></div>';
+    }).join('');
+  }
+
+  function handleSearch(val) {
+    searchQuery = val.trim();
+    renderCatalog();
+  }
+
+  function setFilter(filter, button) {
+    currentFilter = filter;
+    document.querySelectorAll('.chip-btn').forEach((b) => b.classList.remove('active'));
+    button.classList.add('active');
+    renderCatalog();
+  }
+
+  async function loadCatalog() {
+    allPlugins = [];
+    healthReports = {};
+
+    try {
+      const res = await fetch('./test-report.json');
+      if (res.ok) {
+        const list = await res.json();
+        for (const item of list) healthReports[item.id] = item;
+      }
+    } catch (_) {}
+
+    try {
+      const res = await fetch('./manga/repo.json');
+      if (res.ok) {
+        const data = await res.json();
+        (data.plugins || []).forEach((p) => allPlugins.push({ ...p, type: 'manga' }));
+      }
+    } catch (_) {}
+
+    try {
+      const res = await fetch('./ebook/repo.json');
+      if (res.ok) {
+        const data = await res.json();
+        (data.plugins || []).forEach((p) => allPlugins.push({ ...p, type: 'ebook' }));
+      }
+    } catch (_) {}
+
+    renderCatalog();
+  }
+
+  loadCatalog();
+</script>
+</body>
+</html>
