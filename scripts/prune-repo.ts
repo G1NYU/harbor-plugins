@@ -171,6 +171,26 @@ const DEBUG_SNIPPET = [
   '',
 ].join('\n');
 
+// Load-time guard: if the bundle throws while loading in Harbor, register a plugin that shows the error and missing runtime features
+function loadGuardTail(id: string, name: string): string {
+  return (
+    '\n} catch (__e) {\n' +
+    [
+      '(function () {',
+      '  var t = { TextDecoder: typeof TextDecoder, TextEncoder: typeof TextEncoder, URL: typeof URL, URLSearchParams: typeof URLSearchParams, structuredClone: typeof structuredClone, Intl: typeof Intl, atob: typeof atob, btoa: typeof btoa, setTimeout: typeof setTimeout, AbortController: typeof AbortController, Headers: typeof Headers, Blob: typeof Blob, FormData: typeof FormData, Proxy: typeof Proxy, Reflect: typeof Reflect, WeakRef: typeof WeakRef, queueMicrotask: typeof queueMicrotask, globalThis: typeof globalThis, crypto: typeof crypto, window: typeof window, document: typeof document, self: typeof self };',
+      '  var miss = [];',
+      '  for (var k in t) { if (t[k] === "undefined") miss.push(k); }',
+      '  var m = (__e && __e.message) ? __e.message : String(__e);',
+      '  var st = (__e && __e.stack) ? String(__e.stack).split("\\n").slice(0, 2).join(" / ") : "";',
+      '  var msg = "LOAD ERR: " + m + (st ? " | " + st : "") + " | missing: " + (miss.length ? miss.join(",") : "none");',
+      '  var rows = function () { var out = []; for (var i = 0; i < msg.length && out.length < 12; i += 34) out.push({ id: "debug-" + out.length, title: msg.slice(i, i + 34) }); return out; };',
+      '  harbor.register({ id: ' + JSON.stringify(id) + ', name: ' + JSON.stringify(name) + ', popular: async function () { return rows(); }, search: async function () { return rows(); }, detail: async function (id) { return { id: id, title: msg.slice(0, 120), description: msg }; }, chapters: async function () { return []; }, pageUrls: async function () { return []; } });',
+      '})();',
+    ].join('\n') +
+    '\n}\n'
+  );
+}
+
 const repoPath = path.join(DIST, 'repo.json');
 const repo = JSON.parse(fs.readFileSync(repoPath, 'utf-8'));
 const all: any[] = repo.plugins ?? [];
@@ -198,7 +218,7 @@ for (const p of removed) {
   if (fs.existsSync(f)) fs.rmSync(f);
 }
 
-// Inject the debug wrapper into testing-only bundles
+// Inject the debug wrapper and load guard into testing-only bundles
 for (const p of testing) {
   if (DEBUG_SKIP.has(idOf(p)) || !p.entry) continue;
   const f = path.join(DIST, p.entry);
@@ -212,8 +232,11 @@ for (const p of testing) {
     continue;
   }
   const lineStart = code.lastIndexOf('\n', at) + 1;
-  fs.writeFileSync(f, code.slice(0, lineStart) + DEBUG_SNIPPET + code.slice(lineStart), 'utf-8');
+  const injected = code.slice(0, lineStart) + DEBUG_SNIPPET + code.slice(lineStart);
+  const guarded = 'try {\n' + injected + loadGuardTail(String(p.id), String(p.name));
+  fs.writeFileSync(f, guarded, 'utf-8');
   p.version = `${p.version}-dbg`;
+  p.name = `${p.name} [dbg]`;
 }
 
 if (testing.length > 0) {
