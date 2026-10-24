@@ -8,7 +8,7 @@ Atsumaru, Hijala, ManhwaNex, Thunderscans, MangaKatana, MangaDemon and VortexSca
 
 Known issues, also listed on the pages site:
 
-- Atsumaru: series show no cover images. Series pages, chapters and reader pages load fine. The cover links look correct in the code, so the cause is still open (see the Probe test below).
+- Atsumaru: series showed no cover images. Cause found (see below); a fix is in the build and needs a retest in Harbor. Once covers show, remove this item from the pages site.
 - VortexScans: some of the sites it pulls from (for example NovelBuddy) show "this chapter could not be loaded from this source".
 - MangaDemon: chapters come from several sites and only some of them open.
 
@@ -20,25 +20,31 @@ Known issues, also listed on the pages site:
 - Fix: `scripts/prune-repo.ts` runs the upstream bundle as a function bound to its own global-like object (`EXEC_REPLACE` and `CALL_REPLACE`). It is applied to the published bundles that need it (`SHIM_PUBLISHED`: Thunderscans, MangaKatana, MangaDemon, VortexScans, Atsumaru). TODO: move this into `shared/adapter/paperback-runtime.ts` so every converted bundle gets it.
 - Pirate Vodka's native sources (Hijala, ManhwaNex) never touch `globalThis`, which is why they worked from the start.
 - Harbor's "All Extensions" view mixes results from every installed source, so error cards from one source can sit next to real titles from another.
+- Plugins can only hand Harbor bare image links, so they cannot attach headers to images.
+
+### Atsumaru covers
+
+Probe fetched covers from Atsumaru's list API inside Harbor. Headers and referer made no difference (all returned 200). Atsumaru lists four variants per series: `image` is a JPEG (about 110-140KB), while `smallImage`, `mediumImage` and `largeImage` are AVIF files. The upstream code used `mediumImage` first, so every cover was an AVIF, which Harbor does not show in covers (chapter pages load fine). Fix: `scripts/prune-repo.ts` reorders the choice in the published Atsumaru bundle to `image ?? mediumImage ?? smallImage` (`ATSUMARU_COVER_RE`). Not yet verified: the cover on a series' own detail page may use a different field.
 
 ### Debug tooling (testing repo)
 
 Testing repo: `manga/repo-testing.json` on the pages site. Sources in it get a debug wrapper at build time:
 
-- The name ends in `[dbg]` and the version in `-dbg`, so you can tell Harbor loaded the new build.
+- The name ends in `[dbg]` and the version in `-dbg.i1`, so you can tell Harbor loaded the new build.
 - A crash while loading shows as rows starting with `LOAD ERR`, followed by the error and the browser features Harbor lacks.
-- A failure while running shows `ERR popular`, `ERR search`, `ERR detail` or `ERR chapters`, the code position (`@line:col`, often missing for async errors) and the last web request with its status.
+- A failure while running shows `ERR popular`, `ERR search`, `ERR detail` or `ERR chapters`, the code position (`@line:col`) and the last web request with its status.
 - A call that takes longer than 12 seconds shows `TIMEOUT after 12s` with the last request.
 - Cards cut text after about 35 characters, so messages are split into short rows. Read them in order.
-- Probe (diagnostic) is a plugin that fetches several sites and shows the status of each as rows.
+- Interceptor support: testing bundles keep the request/response interceptors that extensions register (the normal bridge drops them) and run them around each request.
+- Probe (diagnostic) is a plugin that runs a small test from inside Harbor and shows the results as rows. Its current test checks Atsumaru's image fields.
 
 ### Parked (still in testing, not published)
 
-- Kagane: loads now, but its first request (`POST kagane.org/api/v2/sources/list`) returns 403 with a 6KB body, most likely a Cloudflare challenge. Cloudflare also blocked it in CI. Needs a Harbor-side answer on whether its Cloudflare popup can handle POST API calls.
-- Asura Scans: comes from Kodama's extension (REST API, account sign-in, tile descrambler). The browse page returns 200 with 230KB, then the parser fails reading `length` of something undefined. Shows only error cards in Harbor.
-- Mangasushi: the upstream code throws "Unsupported Mangasushi metadata or image URL" on a page that downloaded fine. It relies on Paperback's own request checks and saved image authorizations, which Harbor's bridge does not provide. Probably not worth porting.
+- Kagane: loads now, but its first request returns 403 with a 6KB body (`GET /api/v2/genres/list`; earlier `POST /api/v2/sources/list`). Running the extension's own interceptors did not change this. The JSON genre list seen in a popup is most likely Harbor's Cloudflare window showing the response after a manual check. Still to test: solve the popup, then reopen Kagane and see whether Harbor keeps the clearance for plugin requests.
+- Asura Scans: comes from Kodama's extension (REST API, account sign-in, tile descrambler). The browse page returns 200 with 230KB, then the parser fails reading `length` of something undefined (code positions around 143:10332). Shows only error cards in Harbor. Interceptors did not change this.
+- Mangasushi: the upstream code throws "Unsupported Mangasushi metadata or image URL" on a page that downloaded fine (code positions around 138:19174). It relies on Paperback's own request checks and saved image authorizations, which Harbor's bridge does not provide. Probably not worth porting.
 
 ### Next
 
-- Extend Probe to request an Atsumaru cover image with and without a referer, to find out why covers are blank.
+- Retest Atsumaru covers in Harbor, then remove the covers item from the pages site.
 - Move the `globalThis` shim into the converter.

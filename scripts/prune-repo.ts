@@ -107,6 +107,11 @@ const DEBUG_SKIP = new Set<string>(['probe']);
 // Published sources whose bundles need the globalThis shim (they assign globalThis.App at load)
 const SHIM_PUBLISHED = new Set<string>(['thunderscans', 'mangakatana', 'mangademon', 'vortexscans', 'atsumaru']);
 
+// Atsumaru lists several cover variants. The small, medium and large ones are AVIF files that Harbor's covers do not show;
+// the plain image field is a JPEG. Reorder 'X.mediumImage ?? X.smallImage ?? X.image' so the JPEG comes first.
+const ATSUMARU_COVER_RE = /(\w+)(\??\.)mediumImage\?\?\1\2smallImage\?\?\1\2image/g;
+const ATSUMARU_COVER_REPLACE = '$1$2image??$1$2mediumImage??$1$2smallImage';
+
 // Compat shim: many upstream bundles run globalThis.App = ... (or this.App / self.App), but Harbor's runtime has no usable globalThis/self.
 // Run the bundle as a normal function bound to its own global-like object (reads fall through to the real global if present)
 // and keep App in sync with a bare App variable.
@@ -291,18 +296,26 @@ for (const p of removed) {
   if (fs.existsSync(f)) fs.rmSync(f);
 }
 
-// Apply the globalThis shim (only) to published bundles that need it
+// Apply the globalThis shim (and source-specific fixes) to published bundles that need it
 for (const p of kept) {
   if (!SHIM_PUBLISHED.has(idOf(p)) || !p.entry) continue;
   const f = path.join(DIST, p.entry);
   if (!fs.existsSync(f)) continue;
-  const code = fs.readFileSync(f, 'utf-8');
-  if (code.includes('const __realG')) continue;
-  if (code.includes(EXEC_FIND) && code.includes(CALL_FIND)) {
-    fs.writeFileSync(f, code.replace(EXEC_FIND, () => EXEC_REPLACE).replace(CALL_FIND, () => CALL_REPLACE), 'utf-8');
-  } else {
-    console.warn(`  Warning: ${p.entry} has no executeUpstream marker; globalThis shim skipped`);
+  let code = fs.readFileSync(f, 'utf-8');
+  const original = code;
+  if (!code.includes('const __realG')) {
+    if (code.includes(EXEC_FIND) && code.includes(CALL_FIND)) {
+      code = code.replace(EXEC_FIND, () => EXEC_REPLACE).replace(CALL_FIND, () => CALL_REPLACE);
+    } else {
+      console.warn(`  Warning: ${p.entry} has no executeUpstream marker; globalThis shim skipped`);
+    }
   }
+  if (idOf(p) === 'atsumaru') {
+    const fixed = code.replace(ATSUMARU_COVER_RE, ATSUMARU_COVER_REPLACE);
+    if (fixed === code) console.warn('  Warning: Atsumaru cover pattern not found; covers unchanged');
+    code = fixed;
+  }
+  if (code !== original) fs.writeFileSync(f, code, 'utf-8');
 }
 
 // Apply the globalThis shim, interceptor support, debug wrapper and load guard to testing-only bundles
