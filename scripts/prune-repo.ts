@@ -44,6 +44,7 @@ const ORDER = [
   'vortexscans',
   'hijala',
   'manhwanex',
+  'atsumaru',
 ];
 
 // Proven sources: shown in repo.json
@@ -86,6 +87,7 @@ const KEEP = new Set([
   'vortexscans',
   'hijala',
   'manhwanex',
+  'atsumaru',
 ]);
 
 // Work, but with caveats (Cloudflare popup etc.): only shown in repo-extended.json
@@ -94,7 +96,6 @@ const EXTENDED = new Set<string>(['batcave', 'royalroad']);
 // Untested sources: shown in repo-testing.json (add ids here to try new ones)
 const TESTING = new Set<string>([
   'probe',
-  'atsumaru',
   'kagane',
   'mangasushi',
   'asurascans',
@@ -104,7 +105,7 @@ const TESTING = new Set<string>([
 const DEBUG_SKIP = new Set<string>(['probe']);
 
 // Published sources whose bundles need the globalThis shim (they assign globalThis.App at load)
-const SHIM_PUBLISHED = new Set<string>(['thunderscans', 'mangakatana', 'mangademon', 'vortexscans']);
+const SHIM_PUBLISHED = new Set<string>(['thunderscans', 'mangakatana', 'mangademon', 'vortexscans', 'atsumaru']);
 
 // Compat shim: many upstream bundles run globalThis.App = ... (or this.App / self.App), but Harbor's runtime has no usable globalThis/self.
 // Run the bundle as a normal function bound to its own global-like object (reads fall through to the real global if present)
