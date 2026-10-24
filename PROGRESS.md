@@ -1,6 +1,6 @@
 # Progress log
 
-## Handoff (24 Oct 2026, 22:20) - read this first
+## Handoff (24 Oct 2026, 22:30) - read this first
 
 Repo: `G1NYU/harbor-plugins`, branch `main`. Everything is deployed to GitHub Pages by `.github/workflows/deploy.yml` (typecheck, build, validate, update gate, deploy). Deploys take roughly 10-20 minutes and no longer cancel each other (`cancel-in-progress: false`); pushes that only touch `*.md` files do not deploy.
 
@@ -28,7 +28,8 @@ Key files: `scripts/prune-repo.ts` (what is published, plus all test tooling), `
 
 Latest commits, newest first:
 
-- (this commit) docs: close manga/manhwa phase; record eBook/Z-Library next step and cleanup checklist.
+- (this commit) docs: group Mangapill with Atsumaru cover issue; make eBooks the immediate next step.
+- `6c5ba42` docs: close manga/manhwa phase; record eBook/Z-Library next step and cleanup checklist.
 - `5abdb39` delete `plugins/manga/kagane/manifest.json`.
 - `809c15f` delete `plugins/manga/kagane/index.ts`.
 - `2b4bd1c` restore real handoff and progress; retire Probe7.
@@ -37,7 +38,7 @@ Latest commits, newest first:
 
 ## Manga and manhwa: closed for now
 
-The manga/manhwa phase is closed. Legion Scans is published and working, including search. Asura Scans is published and working. Atsumaru works, but its browse-grid covers still do not render; it stays in the main repo and the Pages Known issues card already says its grid covers do not work. No further Atsumaru cover work is planned for now.
+The manga/manhwa phase is closed. Legion Scans is published and working, including search. Asura Scans is published and working. Atsumaru works, but its browse-grid covers still do not render; it stays in the main repo and the Pages Known issues card already says its grid covers do not work. Mangapill had the same browse-grid cover issue and was removed from the main repo because of it. No further cover work is planned for now.
 
 ## Next: eBooks (Z-Library)
 
@@ -56,7 +57,9 @@ Before writing any plugin, answer:
 
 Probe first, then build. Do not guess.
 
-## Cleanup checklist
+## Cleanup checklist (deferred)
+
+Not part of the current eBook phase. Do only if the user asks.
 
 - Delete `plugins/manga/probe/` (retired Probe7 stub).
 - Delete `plugins/manga/mangabuddy-io/` (parked native test plugin).
@@ -108,7 +111,7 @@ From `Seanime-contributions/Seanime-Providers`, `src/manga/` (MIT):
 
 ### Grid covers (Atsumaru, Mangapill)
 
-Atsumaru's `image` JPEG cover links are valid and `harbor.http` fetches them with 200, but the browse grid shows a gradient, and "View image" gave "image request failed 400" once. Mangapill showed the same. Probe 0.0.6 (ten header setups, all 200) is weak evidence (see rule 2). The Discord report was posted; no reply as of 24 Oct 16:13. The correction was dropped: the user decided not to post it. Atsumaru stays in the main repo: the plugin works, but its grid covers do not render, and the Pages Known issues card already says so. No further Atsumaru cover work is planned for now.
+Atsumaru and Mangapill share the same browse-grid cover issue: cover links can be valid and fetchable with `harbor.http`, but the browse grid shows a gradient instead of the image. Atsumaru stays in the main repo; the Pages Known issues card already says its grid covers do not work. Mangapill was removed from the main repo because of covers. Probe 0.0.6 (ten header setups, all 200) is weak evidence (see rule 2). The Discord report was posted; no reply as of 24 Oct 16:13. The correction was dropped: the user decided not to post it. No further cover work is planned for now.
 
 ### Discord report (posted)
 
@@ -176,6 +179,5 @@ Asura Scans (pinned first), Legion Scans (Spanish, second), Atsumaru, Hijala, Ma
 
 ## Next
 
-1. Cleanups after user approval: delete `plugins/manga/probe/`, `plugins/manga/mangabuddy-io/`, `plugins/manga/readall-native/`.
-2. eBook research: Z-Library addon, mirrors, book-page structure, Harbor eBook plugin type, download flow.
-3. Later, optional: move the `globalThis` shim into `shared/adapter/paperback-runtime.ts`.
+1. eBooks: research Z-Library (addon, mirrors, book-page structure, Harbor eBook plugin type, download flow).
+2. Later, only if asked: manga cleanups (delete `plugins/manga/probe/`, `plugins/manga/mangabuddy-io/`, `plugins/manga/readall-native/`) and the `globalThis` shim move.
