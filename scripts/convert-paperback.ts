@@ -106,6 +106,22 @@ async function fetchText(url: string): Promise<string> {
   return res.text();
 }
 
+// Previously published plugins (last deployed manifests). Must be read before repo.json is rewritten.
+function loadPreviousManifests(): Map<string, PluginManifest> {
+  const previous = new Map<string, PluginManifest>();
+  for (const file of ['repo.json', 'repo-extended.json']) {
+    const p = path.join(DIST_MANGA_DIR, file);
+    if (!fs.existsSync(p)) continue;
+    try {
+      const json = JSON.parse(fs.readFileSync(p, 'utf-8'));
+      for (const m of json.plugins ?? []) {
+        if (m && m.id && m.entry) previous.set(String(m.id), m as PluginManifest);
+      }
+    } catch (_) {}
+  }
+  return previous;
+}
+
 async function main() {
   console.log('Starting Automated Manga Upstream Conversion Pipeline...');
 
@@ -117,6 +133,9 @@ async function main() {
   if (!fs.existsSync(DIST_MANGA_DIR)) {
     fs.mkdirSync(DIST_MANGA_DIR, { recursive: true });
   }
+
+  const previous = loadPreviousManifests();
+  const failures = new Map<string, string>();
 
   const upstreams: UpstreamRef[] = [
     {
@@ -197,6 +216,7 @@ async function main() {
 
           if (sizeBytes > config.options.maxBundleSizeMb * 1024 * 1024) {
             console.warn(`  Skipping ${source.name}: exceeds max bundle size (${(sizeBytes / 1024 / 1024).toFixed(2)} MB)`);
+            failures.set(pluginId, 'bundle exceeds max size');
             skippedCount++;
             return;
           }
@@ -204,6 +224,7 @@ async function main() {
           const isValid = testPlugin(wrappedCode, pluginId);
           if (!isValid) {
             console.warn(`  Skipping ${source.name}: failed Harbor compatibility validation`);
+            failures.set(pluginId, 'failed Harbor compatibility validation');
             skippedCount++;
             return;
           }
@@ -237,6 +258,7 @@ async function main() {
           successCount++;
         } catch (err: any) {
           console.warn(`  Failed to process ${source.name}: ${err.message}`);
+          failures.set(pluginId, err.message);
           skippedCount++;
         }
       })
@@ -253,6 +275,21 @@ async function main() {
         convertedManifests.push(manualManifest);
       }
     }
+  }
+
+  // Last-known-good fallback: anything published before that did not convert this run keeps its previous bundle.
+  const restored: Array<{ id: string; version: string; reason: string }> = [];
+  for (const [id, prevManifest] of previous) {
+    if (convertedManifests.some((m) => m.id === id)) continue;
+    const prevFile = path.join(DIST_MANGA_DIR, prevManifest.entry);
+    if (!fs.existsSync(prevFile)) {
+      console.warn(`  Cannot restore ${id}: previous bundle ${prevManifest.entry} is missing`);
+      continue;
+    }
+    convertedManifests.push(prevManifest);
+    const reason = failures.get(id) ?? 'no longer provided by any upstream';
+    restored.push({ id, version: prevManifest.version ?? 'unknown', reason });
+    console.warn(`  Restored ${id} (v${prevManifest.version}) from last known good: ${reason}`);
   }
 
   convertedManifests.sort((a, b) => {
@@ -281,10 +318,13 @@ async function main() {
   const repoJsonPath = path.join(DIST_MANGA_DIR, 'repo.json');
   fs.writeFileSync(repoJsonPath, JSON.stringify(fullRepoManifest, null, 2), 'utf-8');
 
+  fs.writeFileSync(path.join(DIST_MANGA_DIR, 'sync-report.json'), JSON.stringify({ restored }, null, 2), 'utf-8');
+
   console.log('========================================');
   console.log('Upstream Sync and Conversion Complete');
   console.log(`   - Converted and verified: ${successCount} sources`);
   console.log(`   - Skipped or failed:      ${skippedCount} sources`);
+  console.log(`   - Restored from last good: ${restored.length} sources`);
   console.log(`   - Total in repo.json:     ${convertedManifests.length} plugins`);
   console.log(`   - Output manifest:        ${repoJsonPath}`);
   console.log('========================================');

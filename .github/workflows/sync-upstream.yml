@@ -10,6 +10,7 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  issues: write
 
 concurrency:
   group: 'upstream-sync'
@@ -43,6 +44,29 @@ jobs:
 
       - name: Validate All Manifests & Bundles
         run: npm run validate
+
+      - name: Open or update fallback alert
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f dist/manga/sync-report.json ]; then
+            COUNT=$(jq '.restored | length' dist/manga/sync-report.json)
+            if [ "$COUNT" -gt 0 ]; then
+              LINES=$(jq -r '.restored[] | "- " + .id + " (v" + .version + "): " + .reason' dist/manga/sync-report.json)
+              {
+                echo "These sources could not be updated from upstream, so the last known good copy was kept:"
+                echo
+                echo "$LINES"
+              } > alert-body.md
+              EXISTING=$(gh issue list --state open --search "Sync fallback in:title" --json number --jq '.[0].number // empty')
+              if [ -n "$EXISTING" ]; then
+                gh issue comment "$EXISTING" --body-file alert-body.md
+              else
+                gh issue create --title "Sync fallback: sources restored from last known good" --body-file alert-body.md
+              fi
+              rm -f alert-body.md
+            fi
+          fi
 
       - name: Commit & Push Changes
         run: |

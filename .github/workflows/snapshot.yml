@@ -1,0 +1,29 @@
+name: Weekly Snapshot
+
+on:
+  schedule:
+    # Sundays at 07:00 UTC
+    - cron: '0 7 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Create snapshot tag
+        run: |
+          TAG="snapshot-$(date -u +%Y-%m-%d)"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Weekly snapshot $TAG"
+          git push origin "$TAG"

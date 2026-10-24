@@ -128,4 +128,16 @@ fs.writeFileSync(path.join(DIST, 'repo-extended.json'), JSON.stringify(extendedR
 
 repo.plugins = kept;
 fs.writeFileSync(repoPath, JSON.stringify(repo, null, 2), 'utf-8');
+
+// Only report fallbacks for sources that are actually published.
+const reportPath = path.join(DIST, 'sync-report.json');
+if (fs.existsSync(reportPath)) {
+  try {
+    const report = JSON.parse(fs.readFileSync(reportPath, 'utf-8'));
+    const published = new Set([...kept, ...extra].map(idOf));
+    report.restored = (report.restored ?? []).filter((r: any) => published.has(String(r.id).toLowerCase()));
+    fs.writeFileSync(reportPath, JSON.stringify(report, null, 2), 'utf-8');
+  } catch (_) {}
+}
+
 console.log(`Pruned manga repo: kept ${kept.length}, extended +${extra.length}, testing ${testing.length}, removed ${removed.length}`);
