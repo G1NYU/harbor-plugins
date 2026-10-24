@@ -38,6 +38,12 @@ const ORDER = [
   'scansgg',
   'dankefurslesen',
   'punkrecords',
+  'thunderscans',
+  'mangakatana',
+  'mangademon',
+  'vortexscans',
+  'hijala',
+  'manhwanex',
 ];
 
 // Proven sources: shown in repo.json
@@ -74,6 +80,12 @@ const KEEP = new Set([
   'rawkuma',
   'scythescans',
   'tcbscans',
+  'thunderscans',
+  'mangakatana',
+  'mangademon',
+  'vortexscans',
+  'hijala',
+  'manhwanex',
 ]);
 
 // Work, but with caveats (Cloudflare popup etc.): only shown in repo-extended.json
@@ -83,19 +95,16 @@ const EXTENDED = new Set<string>(['batcave', 'royalroad']);
 const TESTING = new Set<string>([
   'probe',
   'atsumaru',
-  'mangakatana',
-  'mangademon',
-  'thunderscans',
-  'hijala',
   'kagane',
   'mangasushi',
-  'manhwanex',
-  'vortexscans',
   'asurascans',
 ]);
 
-// Testing sources that already work: no debug wrapper
-const DEBUG_SKIP = new Set<string>(['probe', 'hijala', 'manhwanex']);
+// Testing sources that get no debug wrapper
+const DEBUG_SKIP = new Set<string>(['probe']);
+
+// Published sources whose bundles need the globalThis shim (they assign globalThis.App at load)
+const SHIM_PUBLISHED = new Set<string>(['thunderscans', 'mangakatana', 'mangademon', 'vortexscans']);
 
 // Compat shim: many upstream bundles run globalThis.App = ... (or this.App / self.App), but Harbor's runtime has no usable globalThis/self.
 // Run the bundle as a normal function bound to its own global-like object (reads fall through to the real global if present)
@@ -246,6 +255,20 @@ for (const p of removed) {
   if (!p.entry) continue;
   const f = path.join(DIST, p.entry);
   if (fs.existsSync(f)) fs.rmSync(f);
+}
+
+// Apply the globalThis shim (only) to published bundles that need it
+for (const p of kept) {
+  if (!SHIM_PUBLISHED.has(idOf(p)) || !p.entry) continue;
+  const f = path.join(DIST, p.entry);
+  if (!fs.existsSync(f)) continue;
+  const code = fs.readFileSync(f, 'utf-8');
+  if (code.includes('const __realG')) continue;
+  if (code.includes(EXEC_FIND) && code.includes(CALL_FIND)) {
+    fs.writeFileSync(f, code.replace(EXEC_FIND, () => EXEC_REPLACE).replace(CALL_FIND, () => CALL_REPLACE), 'utf-8');
+  } else {
+    console.warn(`  Warning: ${p.entry} has no executeUpstream marker; globalThis shim skipped`);
+  }
 }
 
 // Apply the globalThis shim, debug wrapper and load guard to testing-only bundles
