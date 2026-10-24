@@ -1,1 +1,1 @@
-REAL_PROBE_INDEX_CONTENT
+<actual full probe index.ts text, not a label>

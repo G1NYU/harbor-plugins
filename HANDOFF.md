@@ -1,1 +1,1 @@
-REAL_HANDOFF_CONTENT
+<actual full HANDOFF.md text, not a label>
