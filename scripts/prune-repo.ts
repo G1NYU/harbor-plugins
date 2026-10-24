@@ -97,6 +97,17 @@ const TESTING = new Set<string>([
 // Testing sources that already work: no debug wrapper
 const DEBUG_SKIP = new Set<string>(['probe', 'hijala', 'manhwanex']);
 
+// Compat shim: many upstream bundles run globalThis.App = ..., but Harbor's runtime has no usable globalThis.
+// Give the bundle its own globalThis (reads fall through to the real one if present) and keep App in sync with a bare App variable.
+const EXEC_FIND = 'const __executeUpstream = (Application) => {';
+const EXEC_REPLACE = [
+  'const __realG = (typeof globalThis === "object" && globalThis) ? globalThis : null;',
+  'const __executeUpstream = (Application) => {',
+  '  var globalThis = Object.create(__realG);',
+  '  var App;',
+  '  try { Object.defineProperty(globalThis, "App", { configurable: true, enumerable: true, get: function () { return App; }, set: function (v) { App = v; } }); } catch (_) {}',
+].join('\n');
+
 // Debug wrapper injected into testing-repo bundles: shows real errors as rows (cards cut text, so short rows)
 const DEBUG_SNIPPET = [
   '  // --- debug wrapper (testing repo only) ---',
@@ -108,6 +119,7 @@ const DEBUG_SNIPPET = [
   '      var oh = harbor.http;',
   '      harbor.http = async function (u, o) {',
   '        var m = (o && o.method) || "GET";',
+  '        lastReq = m + " " + String(u).slice(0, 80) + " -> pending";',
   '        try {',
   '          var r = await oh.call(harbor, u, o);',
   '          lastReq = m + " " + String(u).slice(0, 80) + " -> " + r.status + " " + Math.round(String(r.body || "").length / 1024) + "KB";',
@@ -132,7 +144,8 @@ const DEBUG_SNIPPET = [
   '      plugin[name] = async function () {',
   '        var args = arguments;',
   '        try {',
-  '          var r = await orig.apply(this, args);',
+  '          var tmo = (typeof setTimeout === "function") ? new Promise(function (_, rej) { setTimeout(function () { rej(new Error("TIMEOUT after 12s")); }, 12000); }) : new Promise(function () {});',
+  '          var r = await Promise.race([orig.apply(this, args), tmo]);',
   '          var emptyQuery = name === "popular" || !args[0];',
   '          if ((!r || r.length === 0) && emptyQuery) return rows("EMPTY " + name + " (0 items parsed)");',
   '          return r;',
@@ -218,13 +231,18 @@ for (const p of removed) {
   if (fs.existsSync(f)) fs.rmSync(f);
 }
 
-// Inject the debug wrapper and load guard into testing-only bundles
+// Apply the globalThis shim, debug wrapper and load guard to testing-only bundles
 for (const p of testing) {
   if (DEBUG_SKIP.has(idOf(p)) || !p.entry) continue;
   const f = path.join(DIST, p.entry);
   if (!fs.existsSync(f)) continue;
-  const code = fs.readFileSync(f, 'utf-8');
+  let code = fs.readFileSync(f, 'utf-8');
   if (code.includes('debug wrapper (testing repo only)')) continue;
+  if (code.includes(EXEC_FIND)) {
+    code = code.replace(EXEC_FIND, () => EXEC_REPLACE);
+  } else {
+    console.warn(`  Warning: ${p.entry} has no executeUpstream marker; globalThis shim skipped`);
+  }
   const marker = '// Register with Harbor';
   const at = code.lastIndexOf(marker);
   if (at < 0) {
