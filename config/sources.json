@@ -20,6 +20,21 @@
       "name": "karrot0/KakarotExtension",
       "versioningUrl": "https://raw.githubusercontent.com/karrot0/KakarotExtension/gh-pages/0.9/stable/versioning.json",
       "rawBaseUrl": "https://raw.githubusercontent.com/karrot0/KakarotExtension/gh-pages/0.9/stable"
+    },
+    {
+      "name": "LucifersCircle/pirate.vodka-extensions (read.pirate.vodka)",
+      "versioningUrl": "https://read.pirate.vodka/0.9/stable/versioning.json",
+      "rawBaseUrl": "https://read.pirate.vodka/0.9/stable"
+    },
+    {
+      "name": "LucifersCircle/pirate.vodka-extensions (github.io)",
+      "versioningUrl": "https://lucifersCircle.github.io/pirate.vodka-extensions/0.9/stable/versioning.json",
+      "rawBaseUrl": "https://lucifersCircle.github.io/pirate.vodka-extensions/0.9/stable"
+    },
+    {
+      "name": "itskodama/paperback-extensions",
+      "versioningUrl": "https://itskodama.github.io/paperback-extensions/0.9/stable/versioning.json",
+      "rawBaseUrl": "https://itskodama.github.io/paperback-extensions/0.9/stable"
     }
   ],
   "syncMode": "all",

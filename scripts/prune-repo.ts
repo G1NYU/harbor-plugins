@@ -80,7 +80,18 @@ const KEEP = new Set([
 const EXTENDED = new Set<string>(['batcave', 'royalroad']);
 
 // Untested sources: shown in repo-testing.json (add ids here to try new ones)
-const TESTING = new Set<string>([]);
+const TESTING = new Set<string>([
+  'atsumaru',
+  'mangakatana',
+  'mangademon',
+  'thunderscans',
+  'hijala',
+  'kagane',
+  'mangasushi',
+  'manhwanex',
+  'vortexscans',
+  'asurascans',
+]);
 
 const repoPath = path.join(DIST, 'repo.json');
 const repo = JSON.parse(fs.readFileSync(repoPath, 'utf-8'));
