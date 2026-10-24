@@ -1,94 +1,118 @@
 import type { MangaProvider, MangaSummary } from '@shared/types/manga.js';
 
+const BASE = 'https://legionscans.com';
 const UA =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36';
+  'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36';
 
-const SITES: Array<[string, string]> = [
-  ['rco', 'https://readcomicsonline.ru/'],
-  ['rac', 'https://readallcomics.com/'],
-  ['zip', 'https://zipcomic.com/'],
-];
+let lastMsg = '';
 
-interface Res {
-  status: string;
-  body: string;
-  ct: string;
-  err?: string;
+function rows(msgs: string[]): MangaSummary[] {
+  lastMsg = msgs.join(' | ');
+  const out: MangaSummary[] = [];
+  for (const m of msgs) {
+    for (let i = 0; i < m.length && out.length < 40; i += 34) {
+      out.push({ id: 'err-' + out.length, title: m.slice(i, i + 34) } as MangaSummary);
+    }
+  }
+  return out;
 }
 
-async function call(url: string): Promise<Res> {
+function guard<T>(p: Promise<T>, ms: number): Promise<T> {
+  if (typeof setTimeout !== 'function') return p;
+  return Promise.race([
+    p,
+    new Promise<T>((_, rej) => setTimeout(() => rej(new Error('guard ' + ms)), ms)),
+  ]);
+}
+
+async function get(url: string): Promise<{ status: number; body: string }> {
+  const r: any = await guard(
+    harbor.http(url, { responseType: 'text', timeoutMs: 8000, headers: { 'User-Agent': UA, Accept: '*/*' } } as any),
+    9000,
+  );
+  return { status: Number(r?.status ?? 0), body: String(r?.body ?? '') };
+}
+
+async function step(label: string, url: string, out: string[]): Promise<string> {
   try {
-    const r: any = await harbor.http(url, { responseType: 'text', timeoutMs: 20000, headers: { 'User-Agent': UA } } as any);
-    const h: any = r?.headers || {};
-    return {
-      status: String(r?.status ?? '?'),
-      body: String(r?.body ?? ''),
-      ct: String(h['content-type'] || h['Content-Type'] || '?').slice(0, 20),
-    };
+    const r = await get(url);
+    out.push(label + ' ' + r.status + ' ' + Math.round(r.body.length / 1024) + 'KB');
+    return r.status === 200 ? r.body : '';
   } catch (e: any) {
-    return { status: 'ERR', body: '', ct: '', err: String((e && e.message) || e).slice(0, 50) };
+    out.push('ERR ' + label + ': ' + String((e && e.message) || e).slice(0, 60));
+    return '';
   }
 }
 
-function challenged(b: string): boolean {
-  return b.includes('Just a moment') || b.includes('challenges.cloudflare.com') || b.includes('cf-turnstile');
-}
-
-function hostOf(url: string): string {
-  const m = /^https?:\/\/([^/]+)/i.exec(url);
+function host(u: string): string {
+  const m = /^https?:\/\/([^\/]+)/i.exec(u);
   return m ? m[1] : '?';
 }
 
-async function lines(): Promise<string[]> {
-  const out: string[] = ['cf:Y = Cloudflare check page'];
-  for (const [tag, url] of SITES) {
-    const home = await call(url);
-    if (home.status === 'ERR') {
-      out.push(tag + ' home: ERR ' + (home.err || ''));
-      continue;
-    }
-    out.push(tag + ' home: ' + home.status + ' ' + Math.round(home.body.length / 1024) + 'KB cf:' + (challenged(home.body) ? 'Y' : 'N'));
-    const m = /<img[^>]+?(?:data-src|src)="(https?:\/\/[^"]+?\.(?:jpe?g|png|webp)(?:\?[^"]*)?)"/i.exec(home.body);
-    if (!m) {
-      out.push(tag + ' no cover link found');
-      continue;
-    }
-    const img = await call(m[1]);
-    out.push(tag + ' img ' + hostOf(m[1]) + ': ' + img.status + ' ' + img.ct + ' ' + Math.round(img.body.length / 1024) + 'KB');
+async function run(): Promise<MangaSummary[]> {
+  const out: string[] = ['PROBE4 v0.0.1 legion'];
+  const home = await step('HOME /', BASE + '/', out);
+  const wp = await step('HOME /wp/', BASE + '/wp/', out);
+  const html = home || wp;
+  if (!html) return rows(out.concat('NO HOME PAGE, stop'));
+
+  const sm = /href="(https?:\/\/legionscans\.com[^"]*\/series\/[^"#]+)"/i.exec(html);
+  out.push('series link: ' + (sm ? 'yes' : 'NO'));
+  const cm = /<img[^>]+src="(https?:\/\/[^"]+\.(?:jpe?g|png|webp)[^"]*)"/i.exec(html);
+  if (cm) {
+    out.push('cover host:');
+    out.push(host(cm[1]));
+    await step('COVER', cm[1], out);
+  } else {
+    out.push('cover: none found');
   }
-  return out;
+  if (!sm) return rows(out);
+
+  const sp = await step('SERIES pg', sm[1], out);
+  if (!sp) return rows(out);
+  const n = (sp.match(/eph-num/g) || []).length;
+  out.push('chapter links: ' + n);
+  const chm = /class="eph-num">\s*<a[^>]+href="([^"]+)"/i.exec(sp);
+  if (!chm) return rows(out);
+
+  const ch = await step('CHAPTER pg', chm[1], out);
+  if (!ch) return rows(out);
+  const im = /"sources":\s*\[[\s\S]*?"images":\s*\[\s*"([^"]+)"/.exec(ch.replace(/\\\//g, '/'));
+  if (!im) return rows(out.concat('sources JSON: NOT FOUND'));
+  out.push('page img host:');
+  out.push(host(im[1]));
+  await step('PAGE IMG', im[1], out);
+  out.push('DONE');
+  return rows(out);
 }
 
-function toRows(ls: string[]): MangaSummary[] {
-  const out: MangaSummary[] = [];
-  for (const l of ls) {
-    for (let i = 0; i < l.length && out.length < 60; i += 34) {
-      out.push({ id: 'r' + out.length, title: l.slice(i, i + 34) } as MangaSummary);
+const plugin: MangaProvider = {
+  id: 'probe4',
+  name: 'Probe4 Legion v0.0.1 (diag)',
+
+  async popular(offset: number) {
+    if (offset > 0) return [];
+    try {
+      return await run();
+    } catch (e: any) {
+      return rows(['FATAL ' + String((e && e.message) || e).slice(0, 100)]);
     }
-  }
-  return out;
-}
-
-async function rows(): Promise<MangaSummary[]> {
-  try {
-    return toRows(await lines());
-  } catch (e: any) {
-    return toRows(['PROBE ERR: ' + String((e && e.message) || e)]);
-  }
-}
-
-export const plugin: MangaProvider = {
-  id: 'probe3',
-  name: 'Probe3 western sites (diagnostic)',
-  popular: () => rows(),
-  search: () => rows(),
-  async detail(id: string) {
-    return { id, title: id } as any;
   },
-  async chapters() {
+
+  async search(_q: string, offset: number) {
+    if (offset > 0) return [];
+    return run();
+  },
+
+  async detail(id: string) {
+    return { id, title: lastMsg.slice(0, 120), description: lastMsg } as MangaSummary;
+  },
+
+  async chapters(_id: string) {
     return [];
   },
-  async pageUrls() {
+
+  async pageUrls(_id: string) {
     return [];
   },
 };

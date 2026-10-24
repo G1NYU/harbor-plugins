@@ -1,9 +1,9 @@
 {
-  "id": "probe3",
-  "name": "Probe3 western sites (diagnostic)",
+  "id": "probe4",
+  "name": "Probe4 Legion v0.0.1 (diag)",
   "version": "0.0.1",
-  "lang": "en",
+  "lang": "es",
   "nsfw": false,
-  "entry": "probe3.plugin.js",
-  "description": "Diagnostic: loads the home pages of readcomicsonline.ru, readallcomics.com and zipcomic.com from inside Harbor and requests the first cover image of each, to see whether Cloudflare or the image host blocks plain requests"
+  "entry": "probe4.plugin.js",
+  "description": "Diagnostic: loads legionscans.com from inside Harbor, then requests one cover, one series page, one chapter page and one chapter image with plain requests, and prints short status rows"
 }
