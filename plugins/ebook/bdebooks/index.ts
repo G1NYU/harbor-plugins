@@ -54,23 +54,32 @@ export const plugin: EBookProvider = {
   },
 
   async search(query: string, offset: number): Promise<EBookSummary[]> {
-    const page = Math.floor(offset / 20) + 1;
-    const doc = await getDoc(`/en/search/?q=${encodeURIComponent(query)}&page=${page}`);
-    const results = doc
-      .querySelectorAll('a[href*="/books/"]')
-      .map(parseBookLink)
-      .filter((b): b is EBookSummary => b !== null);
+    try {
+      const page = Math.floor(offset / 20) + 1;
+      const doc = await getDoc(`/en/search/?q=${encodeURIComponent(query)}&page=${page}`);
+      const results = doc
+        .querySelectorAll('a[href*="/books/"]')
+        .map(parseBookLink)
+        .filter((b): b is EBookSummary => b !== null);
 
-    if (results.length === 0) {
+      if (results.length === 0) {
+        return [
+          {
+            id: 'debug-search',
+            title: `SEARCH 0 | ${query}`,
+          },
+        ];
+      }
+
+      return results;
+    } catch (e: any) {
       return [
         {
-          id: 'debug-search',
-          title: `SEARCH 0 | ${query}`,
+          id: 'debug-search-err',
+          title: `SEARCH ERR | ${e?.message || e}`,
         },
       ];
     }
-
-    return results;
   },
 
   async detail(id: string): Promise<EBookSummary | null> {
@@ -91,43 +100,52 @@ export const plugin: EBookProvider = {
   },
 
   async chapters(id: string): Promise<EBookChapter[]> {
-    currentBookId = id;
-    const doc = await getDoc(`/en/books/${id}/read/`);
-    const links = doc.querySelectorAll('a[href*="chapter="]');
-    const allLinks = doc.querySelectorAll('a');
+    try {
+      currentBookId = id;
+      const doc = await getDoc(`/en/books/${id}/read/`);
+      const links = doc.querySelectorAll('a[href*="chapter="]');
+      const allLinks = doc.querySelectorAll('a');
 
-    const chapters: EBookChapter[] = [];
-    const seen = new Set<string>();
+      const chapters: EBookChapter[] = [];
+      const seen = new Set<string>();
 
-    for (const a of links) {
-      const href = a.attr('href') || '';
-      const match = href.match(/chapter=(\d+)/);
-      if (!match) continue;
+      for (const a of links) {
+        const href = a.attr('href') || '';
+        const match = href.match(/chapter=(\d+)/);
+        if (!match) continue;
 
-      const chapterId = match[1];
-      if (seen.has(chapterId)) continue;
-      seen.add(chapterId);
+        const chapterId = match[1];
+        if (seen.has(chapterId)) continue;
+        seen.add(chapterId);
 
-      const title = a.text().trim() || `Chapter ${chapterId}`;
+        const title = a.text().trim() || `Chapter ${chapterId}`;
 
-      chapters.push({
-        id: chapterId,
-        title,
-        chapter: chapterId,
-        position: chapters.length,
-      });
-    }
+        chapters.push({
+          id: chapterId,
+          title,
+          chapter: chapterId,
+          position: chapters.length,
+        });
+      }
 
-    if (chapters.length === 0) {
+      if (chapters.length === 0) {
+        return [
+          {
+            id: 'debug-chapters',
+            title: `CHAPTERS 0 | LINKS ${allLinks.length}`,
+          },
+        ];
+      }
+
+      return chapters;
+    } catch (e: any) {
       return [
         {
-          id: 'debug-chapters',
-          title: `CHAPTERS 0 | LINKS ${allLinks.length}`,
+          id: 'debug-chapters-err',
+          title: `CHAPTERS ERR | ${e?.message || e}`,
         },
       ];
     }
-
-    return chapters;
   },
 
   async content(chapterId: string): Promise<string> {
