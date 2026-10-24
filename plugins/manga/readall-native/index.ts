@@ -23,7 +23,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  * The page parsing here is regex based because the exact HTML was not inspected; expect small
- * mismatches. Search for 'diag' to test the image hosts and see what the parser found.
+ * mismatches. Search for 'diag' to time the site and test the image hosts.
  */
 import type { MangaChapter, MangaProvider, MangaSummary } from '@shared/types/manga.js';
 
@@ -55,12 +55,35 @@ function isRow(id: string): boolean {
   return id.indexOf('err-') === 0 || id.indexOf('diag-') === 0;
 }
 
+// Make sure a request that hangs ends in an error row instead of Harbor's own "source did not respond"
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  if (typeof setTimeout !== 'function') return p;
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('TIMEOUT ' + Math.round(ms / 1000) + 's ' + label)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
+}
+
 async function getHtml(url: string): Promise<string> {
-  const r: any = await harbor.http(url, { responseType: 'text', timeoutMs: 20000, headers: { 'User-Agent': UA } } as any);
+  const label = url.replace(SITE, '') || '/';
+  const r: any = await withTimeout(
+    harbor.http(url, { responseType: 'text', timeoutMs: 8000, headers: { 'User-Agent': UA } } as any),
+    10000,
+    label,
+  );
   const status = Number(r?.status ?? 0);
   if (status !== 200) {
     const snippet = String(r?.body ?? '').replace(/\s+/g, ' ').slice(0, 90);
-    throw new Error('HTTP ' + status + ' ' + url.replace(SITE, '') + (snippet ? ' | ' + snippet : ''));
+    throw new Error('HTTP ' + status + ' ' + label + (snippet ? ' | ' + snippet : ''));
   }
   return String(r?.body ?? '');
 }
@@ -149,15 +172,25 @@ function debugChapter(id: string, msg: string): MangaChapter {
   return { id: id + '::debug', chapter: null, title: msg.slice(0, 120), pages: 0, language: 'en' };
 }
 
-// Search for 'diag': tests the cover host and a page image host with plain requests
-async function probeImage(label: string, url: string): Promise<string> {
+function cfPage(b: string): boolean {
+  return b.includes('Just a moment') || b.includes('challenges.cloudflare.com') || b.includes('cf-turnstile');
+}
+
+// Times one request and describes the answer in a few characters; never throws
+async function timed(label: string, url: string, ms: number): Promise<string> {
+  const t0 = Date.now();
   try {
-    const r: any = await harbor.http(url, { responseType: 'text', timeoutMs: 20000, headers: { 'User-Agent': UA } } as any);
+    const r: any = await withTimeout(
+      harbor.http(url, { responseType: 'text', timeoutMs: ms, headers: { 'User-Agent': UA } } as any),
+      ms + 1500,
+      label,
+    );
     const h: any = r?.headers || {};
-    const ct = String(h['content-type'] || h['Content-Type'] || '?').slice(0, 24);
-    return label + ': ' + r?.status + ' ' + ct + ' ' + Math.round(String(r?.body || '').length / 1024) + 'KB';
+    const ct = String(h['content-type'] || h['Content-Type'] || '?').slice(0, 16);
+    const body = String(r?.body || '');
+    return label + ': ' + r?.status + ' ' + ct + ' ' + Math.round(body.length / 1024) + 'KB ' + (Date.now() - t0) + 'ms cf:' + (cfPage(body) ? 'Y' : 'N');
   } catch (e) {
-    return label + ': ERR ' + errText(e).slice(0, 50);
+    return label + ': ' + errText(e).slice(0, 40) + ' ' + (Date.now() - t0) + 'ms';
   }
 }
 
@@ -166,24 +199,24 @@ function hostOf(url: string): string {
   return m ? m[1] : '?';
 }
 
+// Search for 'diag': times readallcomics.com against a control site, then tests the image hosts
 async function diagnostics(): Promise<MangaSummary[]> {
   const lines: string[] = [];
-  try {
-    const html = await getHtml(SITE + '/');
-    const items = parseList(html);
-    lines.push('series parsed: ' + items.length + ' of ' + Math.round(html.length / 1024) + 'KB');
-    const first = items[0];
-    if (!first) {
-      lines.push('no series found on home page');
-    } else {
-      lines.push('first: ' + first.title.slice(0, 40));
-      if (first.cover) {
-        lines.push('cover host: ' + hostOf(first.cover));
-        lines.push(await probeImage('cover', first.cover));
-      } else {
-        lines.push('first series has no cover link');
-      }
-      try {
+  lines.push(await timed('rac', SITE + '/', 6000));
+  lines.push(await timed('rac www', 'https://www.readallcomics.com/', 6000));
+  lines.push(await timed('control asura', 'https://asurascans.com/', 6000));
+  if (lines[0].indexOf(': 200 ') > 0) {
+    try {
+      const html = await getHtml(SITE + '/');
+      const items = parseList(html);
+      lines.push('series parsed: ' + items.length);
+      const first = items[0];
+      if (first) {
+        lines.push('first: ' + first.title.slice(0, 40));
+        if (first.cover) {
+          lines.push('cover host: ' + hostOf(first.cover));
+          lines.push(await timed('cover', first.cover, 6000));
+        }
         const chs = await plugin.chapters(first.id);
         lines.push('chapters parsed: ' + chs.length);
         const ch = chs.find((c) => c.id.indexOf('::debug') < 0);
@@ -192,17 +225,13 @@ async function diagnostics(): Promise<MangaSummary[]> {
           lines.push('pages parsed: ' + pages.length);
           if (pages[0]) {
             lines.push('page host: ' + hostOf(pages[0]));
-            lines.push(await probeImage('page', pages[0]));
+            lines.push(await timed('page', pages[0], 6000));
           }
-        } else {
-          lines.push('no chapter to test');
         }
-      } catch (e) {
-        lines.push('diag chapter ERR ' + errText(e).slice(0, 80));
       }
+    } catch (e) {
+      lines.push('diag chain ERR ' + errText(e).slice(0, 80));
     }
-  } catch (e) {
-    lines.push('diag ERR ' + errText(e).slice(0, 120));
   }
   const out: MangaSummary[] = [];
   for (const l of lines) {
@@ -214,8 +243,8 @@ async function diagnostics(): Promise<MangaSummary[]> {
 }
 
 const plugin: MangaProvider = {
-  id: 'readall-native1',
-  name: 'ReadAllComics (native) 0.0.1',
+  id: 'readall-native2',
+  name: 'ReadAllComics (native) 0.0.2',
 
   async popular(offset: number) {
     if (offset > 0) return [];
