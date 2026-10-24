@@ -14,7 +14,6 @@ const ORDER = [
   'mgeko',
   'kingofshojo',
   'manhuaplus',
-  'mangapill',
   'flamecomics',
   'hivetoons',
   'mangadistrict',
@@ -56,7 +55,6 @@ const KEEP = new Set([
   'lilymanga',
   'lnori',
   'mangadistrict',
-  'mangapill',
   'mangaworld',
   'mangaworldadult',
   'manhuaplus',
@@ -386,7 +384,7 @@ for (const p of testing) {
   const guarded = 'try {\n' + injected + loadGuardTail(String(p.id), String(p.name));
   fs.writeFileSync(f, guarded, 'utf-8');
   p.version = `${p.version}-dbg.i2`;
-  p.name = `${p.name} [dbg]`;
+  p.name = `${p.name} [dbg.i2]`;
 }
 
 if (testing.length > 0) {
