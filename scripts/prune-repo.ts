@@ -76,6 +76,9 @@ const KEEP = new Set([
   'tcbscans',
 ]);
 
+// Work, but with caveats (Cloudflare popup etc.): only shown in repo-extended.json
+const EXTENDED = new Set<string>(['batcave', 'royalroad']);
+
 // Untested sources: shown in repo-testing.json (add ids here to try new ones)
 const TESTING = new Set<string>([]);
 
@@ -90,10 +93,11 @@ const rank = (p: any) => {
 };
 
 const kept = all.filter((p) => KEEP.has(idOf(p))).sort((a, b) => rank(a) - rank(b));
+const extra = all.filter((p) => EXTENDED.has(idOf(p)));
 const testing = all.filter((p) => TESTING.has(idOf(p)));
-const removed = all.filter((p) => !KEEP.has(idOf(p)) && !TESTING.has(idOf(p)));
+const removed = all.filter((p) => !KEEP.has(idOf(p)) && !EXTENDED.has(idOf(p)) && !TESTING.has(idOf(p)));
 
-for (const id of [...KEEP, ...TESTING]) {
+for (const id of [...KEEP, ...EXTENDED, ...TESTING]) {
   if (!all.some((p) => idOf(p) === id)) {
     console.warn(`  Warning: allowlisted source '${id}' was not found in repo.json`);
   }
@@ -114,6 +118,14 @@ if (testing.length > 0) {
   fs.writeFileSync(path.join(DIST, 'repo-testing.json'), JSON.stringify(testingRepo, null, 2), 'utf-8');
 }
 
+const extendedRepo = {
+  ...repo,
+  name: `${repo.name} (Extended)`,
+  description: `${repo.description ?? ''} Includes sources that work but may show a Cloudflare popup.`.trim(),
+  plugins: [...kept, ...extra],
+};
+fs.writeFileSync(path.join(DIST, 'repo-extended.json'), JSON.stringify(extendedRepo, null, 2), 'utf-8');
+
 repo.plugins = kept;
 fs.writeFileSync(repoPath, JSON.stringify(repo, null, 2), 'utf-8');
-console.log(`Pruned manga repo: kept ${kept.length}, testing ${testing.length}, removed ${removed.length}`);
+console.log(`Pruned manga repo: kept ${kept.length}, extended +${extra.length}, testing ${testing.length}, removed ${removed.length}`);

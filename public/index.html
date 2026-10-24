@@ -25,7 +25,7 @@
   <div class="card">
     <div class="card-header">
       <span class="card-title">ADD TO HARBOR</span>
-      <span class="card-number">01 / 02</span>
+      <span class="card-number">01 / 03</span>
     </div>
     <div class="card-body">
       <div class="repo-grid">
@@ -46,6 +46,14 @@
           </div>
         </div>
       </div>
+      <div class="repo-box" style="margin-top:1rem">
+        <div class="repo-name">Manga Extended <span class="badge badge-warn">optional</span></div>
+        <p class="repo-desc">Everything in the Manga repo plus BatCave and Royal Road. These work, but may show a Cloudflare popup in Harbor. Use this one instead of the Manga repo, not alongside it.</p>
+        <div class="url-box">
+          <code id="url-extended">Loading...</code>
+          <button class="btn" onclick="copyUrl('url-extended', this)">COPY</button>
+        </div>
+      </div>
       <ul class="steps-list">
         <li class="step-item"><span class="step-num">1</span><span><strong>Manga:</strong> Harbor &rarr; Manga &rarr; Set up a source &rarr; Extensions &rarr; paste the manga URL.</span></li>
         <li class="step-item"><span class="step-num">2</span><span><strong>eBook:</strong> Harbor &rarr; eBook &rarr; Sources &rarr; Extensions &rarr; paste the eBook URL.</span></li>
@@ -56,7 +64,7 @@
   <div class="card">
     <div class="card-header">
       <span class="card-title">AVAILABLE SOURCES</span>
-      <span class="card-number">02 / 02</span>
+      <span class="card-number">02 / 03</span>
     </div>
     <div class="card-body">
       <input type="text" id="search-box" class="search-input" placeholder="search by name, id or description" oninput="handleSearch(this.value)">
@@ -72,6 +80,20 @@
       </div>
       <div class="catalog-stats" id="catalog-stats">LOADING SOURCES...</div>
       <div class="plugin-list" id="plugin-container"><div class="empty">Loading available sources...</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">KNOWN ISSUES</span>
+      <span class="card-number">03 / 03</span>
+    </div>
+    <div class="card-body">
+      <ul class="steps-list" style="margin-top:0">
+        <li class="step-item"><span class="step-num">!</span><span><strong>Work, with caveats:</strong> BatCave, Royal Road, StoneScape, MangaK and LikeManga. Each one either triggers an annoying Cloudflare popup or doesn't show series images in Harbor, so they are left out of the main Manga repo.</span></li>
+        <li class="step-item"><span class="step-num">+</span><span><strong>Extended repo:</strong> BatCave and Royal Road are switched on in the Manga Extended repo above.</span></li>
+        <li class="step-item"><span class="step-num">&times;</span><span><strong>Removed:</strong> MangaFire and MangaTown.</span></li>
+      </ul>
     </div>
   </div>
 
@@ -95,13 +117,14 @@
 <script>
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-  function getRepoUrl(subpath) {
+  function getRepoUrl(subpath, file) {
     const path = window.location.pathname.endsWith('/') ? window.location.pathname.slice(0, -1) : window.location.pathname;
-    return window.location.origin + path + '/' + subpath + '/repo.json';
+    return window.location.origin + path + '/' + subpath + '/' + (file || 'repo.json');
   }
 
   document.getElementById('url-manga').textContent = getRepoUrl('manga');
   document.getElementById('url-ebook').textContent = getRepoUrl('ebook');
+  document.getElementById('url-extended').textContent = getRepoUrl('manga', 'repo-extended.json');
 
   async function copyUrl(elementId, button) {
     const text = document.getElementById(elementId).textContent;
