@@ -108,16 +108,15 @@ export const plugin: EBookProvider = {
       const textUrl = `${currentBookUrl}text/`;
       const doc = await getDoc(textUrl);
 
-      const links = doc.querySelectorAll('a[href^="#"]');
+      const headings = doc.querySelectorAll('h1[id], h2[id], h3[id]');
       const chapters: EBookChapter[] = [];
       const seen = new Set<string>();
 
-      for (const a of links as any[]) {
-        const href = a.attr('href') || '';
-        const chapterId = href.slice(1);
+      for (const h of headings as any[]) {
+        const chapterId = h.attr('id') || '';
         if (!chapterId || seen.has(chapterId)) continue;
 
-        const title = a.text().trim();
+        const title = h.text().trim();
         if (!title) continue;
 
         seen.add(chapterId);
@@ -130,10 +129,11 @@ export const plugin: EBookProvider = {
       }
 
       if (chapters.length === 0) {
+        const anchors = doc.querySelectorAll('a[href^="#"]');
         return [
           {
             id: 'debug-chapters',
-            title: `CHAPTERS 0 | ${textUrl}`,
+            title: `CHAPTERS 0 | A ${anchors.length} H ${headings.length} | ${textUrl}`,
           },
         ];
       }
