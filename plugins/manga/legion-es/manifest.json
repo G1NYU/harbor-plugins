@@ -1,10 +1,10 @@
 {
-  "id": "probe-legion1",
-  "name": "Legion Scans ES (test)",
+  "id": "legion-scans",
+  "name": "Legion Scans",
   "version": "0.1.0",
   "lang": "es",
   "nsfw": false,
-  "entry": "probe-legion1.plugin.js",
-  "description": "Spanish manga, manhwa and manhua from legionscans.com (Cerberus Series). Native test version: browse shows the first page of the catalogue only, search is untested.",
+  "entry": "legion-scans.plugin.js",
+  "description": "Spanish manga, manhwa and manhua from legionscans.com (Cerberus Series). Browse shows the first page of the catalogue only. Based on the Cerberus Series provider by branrgx, used with permission.",
   "website": "https://legionscans.com/wp/"
 }

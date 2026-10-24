@@ -7,6 +7,7 @@ const DIST = path.join(process.cwd(), 'dist', 'manga');
 // Ids missing from this list are placed at the end.
 const ORDER = [
   'asura-seanime',
+  'legion-scans',
   'weebcentral',
   'kaynscan',
   'projectsuki',
@@ -50,6 +51,7 @@ const ORDER = [
 // Proven sources: shown in repo.json
 const KEEP = new Set([
   'asura-seanime',
+  'legion-scans',
   'flamecomics',
   'hivetoons',
   'weebcentral',

@@ -134,8 +134,8 @@ function debugChapter(id: string, msg: string): MangaChapter {
 }
 
 const plugin: MangaProvider = {
-  id: 'probe-legion1',
-  name: 'Legion Scans ES (test)',
+  id: 'legion-scans',
+  name: 'Legion Scans',
 
   async popular(offset: number) {
     if (offset > 0) return [];
