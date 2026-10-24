@@ -1,8 +1,10 @@
 # Progress log
 
-## Handoff (24 Oct 2026, 11:20) - read this first
+## Handoff (24 Oct 2026, 11:35) - read this first
 
 Repo: `G1NYU/harbor-plugins`, branch `main`. Everything is deployed to GitHub Pages by `.github/workflows/deploy.yml` (typecheck, build, validate, update gate, deploy). Deploys take roughly 5-20 minutes. Harbor keeps stale copies, so after a push: remove the repo, reinstall the source, and check the version/name marker.
+
+Deploy rules (since `a2067a9`): a running deploy is no longer cancelled by a newer push (`cancel-in-progress: false`; queued pushes wait, only the newest queued one runs), and pushes that only touch `*.md` files do not start a deploy.
 
 Key files:
 
@@ -15,23 +17,38 @@ Repos on the pages site: `manga/repo.json` (main, 38 sources), `manga/repo-exten
 
 Latest commits, newest first:
 
+- `a2067a9` CI: deploys are no longer cancelled by newer pushes; markdown-only pushes skip the deploy.
+- `01cf190` Handoff notes in PROGRESS.md.
 - `19a84ff` Probe 0.0.6: header-combination test for cover requests.
 - `1482ee1` Probe 0.0.5 (titles end in "+T") and the Atsumaru debug copy contacting cover hosts (`[dbg.i3]`).
 - `64b3ad9` PROGRESS.md: cover investigation and the report text.
 - `b5b94e8` Probe 0.0.4: five labelled covers.
 - `5fdac30` Mangapill removed from the main repo.
 
-### Open problem 1: the Probe in Harbor is stale
+### Open problem 1: the Probe in Harbor was stale (cause found, mostly solved)
 
-After pushing Probe 0.0.5 and 0.0.6, Harbor (reinstalled, run green) still shows the 0.0.4 Probe: five cards titled "A wikimedia direct" ... "E thunderscans direct" without "+T". Probe 0.0.6 should instead show rows starting `A=atsumaru cover W=wikimedia image`. Check first:
+Cause: the workflow had `cancel-in-progress: true` and the update gate makes a deploy take 10-20 minutes. Pushes about 10 minutes apart (10:42, 10:53, 11:02, 11:11, 11:20) cancelled each other, so the last build to finish was Probe 0.0.4. This is an inference (the Actions runs were not inspected from here), but the workflow file and the push times fit it. Fixed in `a2067a9`.
 
-1. The Actions runs for `1482ee1` and `19a84ff`: did typecheck, build, validate or the update gate fail? A failed run keeps the old site.
-2. The live `manga/repo-testing.json`: what version does the `probe` entry list (should be `0.0.6`) and do the other entries end in `-dbg.i3`?
-3. If the live file is right but Harbor still shows the old plugin, make Probe's name carry its version (like the `[dbg.i3]` marker) and bump again.
+After the `a2067a9` deploy went green, the new Probe 0.0.6 rows appeared in Harbor. The five old 0.0.4 cards ("A wikimedia direct" ... "E thunderscans direct", no "+T") still showed next to them. The 0.0.6 source cannot produce those cards, so they come from a stale copy in Harbor. If it matters, remove the testing repo and re-add it; if the old cards return, put the version in Probe's name.
 
 ### Open problem 2: grid covers (Atsumaru, Mangapill)
 
-See the cover investigation below. Newest finding: right-clicking an Atsumaru card and choosing View image now shows "image request failed 400". The same cover URL returns `200 image/jpeg` when fetched with `harbor.http`, so Harbor's own image request is probably being rejected by the host. Hypothesis (unconfirmed): the request sends a User-Agent or Referer/Origin (Harbor runs as `tauri.localhost`) that the CDN refuses. Probe 0.0.6 tests ten header setups against the Atsumaru cover and a Wikimedia image; its rows look like `empty UA: A400 W200`. Waiting for the result and for a reply from Harbor's developers.
+See the cover investigation below. Probe 0.0.6 result (read from the cards in Harbor, `A` = Atsumaru cover, `W` = Wikimedia thumbnail, both fetched with `harbor.http`):
+
+- default: A200 W400
+- ref http: A200 W400
+- ref https: A200 W400
+- ref+origin: A200 W400
+- empty UA: A200 W400
+- reqwest UA: A200 W400
+- accept img: A200 W400
+- accept all: A200 W400
+- empty ref: A700 W400
+- site ref: A200 W400
+
+Reading: the Atsumaru cover loads with 200 under every header setup except an empty Referer (700, not a real HTTP code, probably a Harbor-side error; unexplained). So the header theory is not supported: if the grid card gets a 400, it comes from Harbor's own image request, not from headers a plugin can set. The Wikimedia URL returns 400 in every setup, including default, so it is a bad control (Wikimedia often rejects requests with a missing or generic User-Agent; not verified). The status was checked, not the response body.
+
+Waiting for a reply from Harbor's developers.
 
 Working agreements: every push to the repo needs the user's confirmation first; cards in Harbor cut text after about 35 characters, so debug output is split into short rows that must be read in order.
 
@@ -67,15 +84,15 @@ Symptom: the browse grid shows the placeholder gradient instead of a cover, whil
 What was found and tried:
 
 1. Atsumaru lists four image variants per series. `image` is a JPEG (about 110-140KB); `smallImage`, `mediumImage` and `largeImage` are AVIF files. The upstream code used `mediumImage` first, so the published bundle now prefers `image` (`ATSUMARU_COVER_RE`; version `1.0.0-alpha.25.1`). The plugin now returns JPEG links on `cdn.atsu.moe/static/posters/...`.
-2. Probe fetched those covers from inside Harbor with `harbor.http`: default headers, with a referer, and with referer plus a browser user agent all returned 200 with an image. Headers set by a plugin are not the problem.
+2. Probe fetched those covers from inside Harbor with `harbor.http`: default headers, with a referer, and with referer plus a browser user agent all returned 200 with an image. Probe 0.0.6 repeated this with ten header setups (see open problem 2): all 200 except an empty Referer. Headers set by a plugin are not the problem.
 3. The "Atsumaru (cover debug)" copy in the testing repo returned the same JPEG links through the public image proxy `wsrv.nl` (300px JPEG): still a gradient.
 4. Probe 0.0.4 returned five labelled series with different covers: A a Wikimedia JPEG (direct), B the same image via the proxy, C an Atsumaru cover (direct), D the same via the proxy, E a Thunderscans image found on its home page. Only E drew (a small site logo, upscaled and pixelated). A, B, C and D were gradients.
 5. Probe 0.0.5 and the debug copy downloaded each cover (or one per image host) with `harbor.http` before returning the list, in case Harbor only draws covers from hosts a plugin has contacted: no change.
 6. In Harbor, right-click -> View image on an Atsumaru series first showed the cover (saved as a 1800 x 2700 JPEG, i.e. the full-size original from the series detail data); later the same action gave "image request failed 400". The details page works. There is no "copy image address" option.
 
-Conclusion so far: the plugin returns valid absolute JPEG links, but Harbor's own image request for covers seems to be rejected (HTTP 400), so the grid card's request differs from what plugins can send. Mangapill shows the same symptom.
+Conclusion so far: the plugin returns valid absolute JPEG links, `harbor.http` fetches them with 200 under every header setup tried, but Harbor's own image request for covers seems to be rejected (HTTP 400). So the grid card's request differs from what plugins can send. Mangapill shows the same symptom.
 
-### Draft bug report for Harbor's developers (Discord)
+### Discord report for Harbor's developers (final, ready to paste)
 
 Title:
 
@@ -92,22 +109,18 @@ In the browse grid, covers from some plugin sources never render (placeholder gr
 **What works**
 - Series details page shows the cover
 - Chapters and reader pages load fine
-- The URL fetched with harbor.http returns 200 image/jpeg, with or without Referer/User-Agent
+- The cover URL fetched with harbor.http returns 200 (image/jpeg)
 
 **What fails**
-Affected sources: Atsumaru (covers on cdn.atsu.moe) and Mangapill (covers on a separate image host). Other sources (e.g. Thunderscans, MangaKatana) show covers fine. Right-click -> View image on an Atsumaru card now shows "image request failed 400".
+Affected sources: Atsumaru (covers on cdn.atsu.moe) and Mangapill (covers on a separate image host). Other sources (e.g. Thunderscans, MangaKatana) show covers fine. Right-click -> View image on an Atsumaru card sometimes shows "image request failed 400" (it worked once earlier).
 
-**Test I ran (diagnostic plugin, 5 series, each with a different cover)**
-- A: Wikimedia JPEG, direct -> gradient
-- B: same image through an image proxy (wsrv.nl) -> gradient
-- C: Atsumaru cover JPEG, direct -> gradient
-- D: same Atsumaru cover through the proxy -> gradient
-- E: a small image scraped from a Thunderscans page -> draws (upscaled, pixelated)
-
-Downloading each cover once with harbor.http before returning the list made no difference.
+**Tests I ran (diagnostic plugin)**
+- 5 series, each with a different cover: Wikimedia JPEG direct, same through an image proxy (wsrv.nl), Atsumaru cover direct, same through the proxy, and a small image scraped from a Thunderscans page. Only the Thunderscans one draws (upscaled, pixelated). The rest stay gradient.
+- Downloading each cover once with harbor.http before returning the list made no difference.
+- I fetched the Atsumaru cover with harbor.http under 10 header setups (default, Referer http/https, Referer+Origin, empty UA, reqwest UA, Accept image/*, Accept */*, site Referer). All returned 200. Only an empty Referer returned a non-HTTP status (700). So the failure does not depend on headers a plugin can set.
 
 **Question**
-What headers do Harbor's grid / View image requests send (User-Agent, Referer, Origin, Accept)? Is there a rule for which cover URLs the grid draws (host, size, content type)? If it is a bug, I'm happy to test fixes.
+What does the grid / View image request send (User-Agent, Referer, Origin, Accept), and is it made by the webview or by the native side? Is there a rule for which cover URLs the grid draws (host, size, content type, redirects)? If it is a bug, I'm happy to test fixes.
 
 Harbor version: ___   OS: ___
 ```
@@ -123,7 +136,7 @@ Testing repo: `manga/repo-testing.json` on the pages site. Sources in it get a d
 - The home list ends with `COVERS: ...` rows showing the first two cover links the plugin returned. Tapping those rows (or any debug row) shows an error; that is expected.
 - Interceptor support: testing bundles keep the request/response interceptors that extensions register (the normal bridge drops them) and run them around each request.
 - "Atsumaru (cover debug)" is a copy of the published Atsumaru under the id `atsumaru-dbg`; it also downloads one cover per image host before returning a list (`COVER_TOUCH_SNIPPET`).
-- Probe (diagnostic) is a plugin that runs a small test from inside Harbor and shows the results as rows. Current test (0.0.6): the header-combination test described above.
+- Probe (diagnostic) is a plugin that runs a small test from inside Harbor and shows the results as rows. Current test (0.0.6): the header-combination test described above. Idea for 0.0.7: replace the Wikimedia control with an image host that has no User-Agent rule.
 
 ### Parked (still in testing, not published)
 
@@ -133,7 +146,7 @@ Testing repo: `manga/repo-testing.json` on the pages site. Sources in it get a d
 
 ### Next
 
-1. Fix the stale Probe (see open problem 1), then read the Probe 0.0.6 rows.
-2. Post the Discord report (add the Probe 0.0.6 result if it shows a 400) and wait for the grid-cover rule. If a plugin-side change is needed, apply it to Atsumaru (and possibly bring Mangapill back).
+1. Post the Discord report above (fill in Harbor version and OS) and wait for the grid-cover rule. If a plugin-side change is needed, apply it to Atsumaru (and possibly bring Mangapill back).
+2. Optional: Probe 0.0.7 with a better Wikimedia control; remove the stale 0.0.4 Probe copy from Harbor.
 3. Once the cover question is settled, remove the "Atsumaru (cover debug)" copy and the cover-contact snippet from `scripts/prune-repo.ts`, and remove the "No covers" item from the pages site if it is fixed.
 4. Move the `globalThis` shim into the converter (`shared/adapter/paperback-runtime.ts`).
