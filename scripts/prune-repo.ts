@@ -112,6 +112,19 @@ const SHIM_PUBLISHED = new Set<string>(['thunderscans', 'mangakatana', 'mangadem
 const ATSUMARU_COVER_RE = /(\w+)(\??\.)mediumImage\?\?\1\2smallImage\?\?\1\2image/g;
 const ATSUMARU_COVER_REPLACE = '$1$2image??$1$2mediumImage??$1$2smallImage';
 
+// Experiment (testing copy of Atsumaru only): send list covers through a public image proxy that fetches the image itself
+// and returns a small JPEG. Tells us whether covers fail because of the referer/host Harbor uses when loading them.
+const COVER_PROXY_FIND = 'cover: __absUrl(item.imageUrl || item.thumbnailUrl || item.cover)';
+const COVER_PROXY_REPLACE = 'cover: __px(__absUrl(item.imageUrl || item.thumbnailUrl || item.cover))';
+const MAPITEM_FIND = 'function __mapItem(item) {';
+const COVER_PROXY_FN = [
+  'function __px(u) {',
+  '  if (!u) return u;',
+  '  return "https://wsrv.nl/?url=" + encodeURIComponent(u) + "&w=300&output=jpg";',
+  '}',
+  '',
+].join('\n');
+
 // Compat shim: many upstream bundles run globalThis.App = ... (or this.App / self.App), but Harbor's runtime has no usable globalThis/self.
 // Run the bundle as a normal function bound to its own global-like object (reads fall through to the real global if present)
 // and keep App in sync with a bare App variable.
@@ -328,15 +341,24 @@ for (const p of kept) {
   if (code !== original) fs.writeFileSync(f, code, 'utf-8');
 }
 
-// Debug copy of Atsumaru under its own id in the testing repo, to see which cover links the plugin returns inside Harbor
+// Debug copy of Atsumaru under its own id in the testing repo, to see which cover links the plugin returns inside Harbor.
+// This copy also sends list covers through the image proxy (experiment).
 const atsuPub = kept.find((p) => idOf(p) === 'atsumaru');
 if (atsuPub && atsuPub.entry) {
   const srcFile = path.join(DIST, atsuPub.entry);
   if (fs.existsSync(srcFile)) {
     const cloneEntry = 'atsumaru-dbg.plugin.js';
-    const srcCode = fs.readFileSync(srcFile, 'utf-8');
-    if (!srcCode.includes('id: "atsumaru",')) console.warn('  Warning: could not rename the Atsumaru debug copy');
-    fs.writeFileSync(path.join(DIST, cloneEntry), srcCode.replace('id: "atsumaru",', () => 'id: "atsumaru-dbg",'), 'utf-8');
+    let cloneCode = fs.readFileSync(srcFile, 'utf-8');
+    if (!cloneCode.includes('id: "atsumaru",')) console.warn('  Warning: could not rename the Atsumaru debug copy');
+    cloneCode = cloneCode.replace('id: "atsumaru",', () => 'id: "atsumaru-dbg",');
+    if (cloneCode.includes(COVER_PROXY_FIND) && cloneCode.includes(MAPITEM_FIND)) {
+      cloneCode = cloneCode
+        .replace(MAPITEM_FIND, () => COVER_PROXY_FN + MAPITEM_FIND)
+        .replace(COVER_PROXY_FIND, () => COVER_PROXY_REPLACE);
+    } else {
+      console.warn('  Warning: cover proxy markers not found in the Atsumaru debug copy');
+    }
+    fs.writeFileSync(path.join(DIST, cloneEntry), cloneCode, 'utf-8');
     testing.push({ ...atsuPub, id: 'atsumaru-dbg', name: 'Atsumaru (cover debug)', entry: cloneEntry });
   }
 }
@@ -363,7 +385,7 @@ for (const p of testing) {
   const injected = code.slice(0, lineStart) + DEBUG_SNIPPET + code.slice(lineStart);
   const guarded = 'try {\n' + injected + loadGuardTail(String(p.id), String(p.name));
   fs.writeFileSync(f, guarded, 'utf-8');
-  p.version = `${p.version}-dbg.i1`;
+  p.version = `${p.version}-dbg.i2`;
   p.name = `${p.name} [dbg]`;
 }
 
