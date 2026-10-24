@@ -30,6 +30,10 @@ export function generateHarborPluginBundle(sourceCode: string, meta: SourceMeta)
   const __stateStore = new Map();
   const __interceptors = new Set();
 
+  // Remember full series/chapter objects so later calls can pass them back, as the Paperback host does
+  const __mangaCache = new Map();
+  const __chapterCache = new Map();
+
   function __absUrl(url) {
     if (!url) return undefined;
     url = String(url).trim();
@@ -333,6 +337,7 @@ ${sourceCode}
 
       const res = await __ext.getMangaDetails(id);
       if (!res) return null;
+      __mangaCache.set(id, res);
       const info = res.mangaInfo || res;
       const primaryTitle = info.primaryTitle || info.title || id;
       const altTitles = info.secondaryTitles || (info.altTitle ? [info.altTitle] : []);
@@ -356,12 +361,25 @@ ${sourceCode}
         this.__initDone = true;
       }
 
-      const res = await __ext.getChapters({ mangaId: id });
+      const __cached = __mangaCache.get(id);
+      let __smUsed = __cached ? Object.assign({ mangaId: id }, __cached) : { mangaId: id };
+      let res;
+      try {
+        res = await __ext.getChapters(__smUsed);
+      } catch (e) {
+        if (__cached) throw e;
+        const det = await __ext.getMangaDetails(id);
+        if (!det) throw e;
+        __mangaCache.set(id, det);
+        __smUsed = Object.assign({ mangaId: id }, det);
+        res = await __ext.getChapters(__smUsed);
+      }
       const list = Array.isArray(res) ? res : (res?.chapters || []);
       return list
         .map((c, index) => {
           const chapterId = c.chapterId || c.id || String(index);
           const compositeId = \`\${id}::\${chapterId}\`;
+          __chapterCache.set(compositeId, { raw: c, sm: __smUsed });
           return {
             id: compositeId,
             chapter: c.chapNum != null ? String(c.chapNum) : (c.chapter != null ? String(c.chapter) : null),
@@ -391,10 +409,24 @@ ${sourceCode}
         chapterId = parts.slice(1).join("::");
       }
 
-      const res = await __ext.getChapterDetails({
-        sourceManga: { mangaId },
-        chapterId,
-      });
+      const __cc = __chapterCache.get(compositeId);
+      const __sm = (__cc && __cc.sm) || (__mangaCache.get(mangaId) ? Object.assign({ mangaId }, __mangaCache.get(mangaId)) : { mangaId });
+      const __chapterArg = Object.assign({}, __cc ? __cc.raw : {}, { sourceManga: __sm, chapterId });
+
+      let res;
+      try {
+        res = await __ext.getChapterDetails(__chapterArg);
+      } catch (e) {
+        if (__cc) throw e;
+        const det = __mangaCache.get(mangaId) || (await __ext.getMangaDetails(mangaId));
+        if (!det) throw e;
+        __mangaCache.set(mangaId, det);
+        const sm2 = Object.assign({ mangaId }, det);
+        const chs = await __ext.getChapters(sm2);
+        const arr = Array.isArray(chs) ? chs : ((chs && chs.chapters) || []);
+        const found = arr.find((x) => String(x.chapterId || x.id) === chapterId);
+        res = await __ext.getChapterDetails(Object.assign({}, found || {}, { sourceManga: sm2, chapterId }));
+      }
 
       const pages = res?.pages || res?.images || res?.imageUrls || (Array.isArray(res) ? res : []);
       return pages.map(__absUrl).filter(Boolean);
