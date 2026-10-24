@@ -1,9 +1,9 @@
 {
   "id": "probe",
   "name": "Probe (diagnostic)",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "lang": "en",
   "nsfw": false,
   "entry": "probe.plugin.js",
-  "description": "Diagnostic: downloads each test cover once from the plugin, then returns five series to see which covers Harbor draws"
+  "description": "Diagnostic: requests an Atsumaru cover and a Wikimedia image with ten header setups and shows the status of each"
 }

@@ -5,8 +5,31 @@ const API =
 const CDN = 'https://cdn.atsu.moe';
 const WIKI = 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Fronalpstock_big.jpg/320px-Fronalpstock_big.jpg';
 
-async function get(url: string): Promise<any> {
-  return harbor.http(url, { responseType: 'text', timeoutMs: 15000 } as any);
+const VARIANTS: Array<[string, Record<string, string>]> = [
+  ['default', {}],
+  ['ref http', { Referer: 'http://tauri.localhost/' }],
+  ['ref https', { Referer: 'https://tauri.localhost/' }],
+  ['ref+origin', { Referer: 'http://tauri.localhost/', Origin: 'http://tauri.localhost' }],
+  ['empty UA', { 'User-Agent': '' }],
+  ['reqwest UA', { 'User-Agent': 'reqwest/0.12.5' }],
+  ['accept img', { Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8' }],
+  ['accept all', { Accept: '*/*' }],
+  ['empty ref', { Referer: '' }],
+  ['site ref', { Referer: 'https://atsu.moe/' }],
+];
+
+async function getJson(url: string): Promise<any> {
+  const r: any = await harbor.http(url, { responseType: 'text', timeoutMs: 15000 } as any);
+  return JSON.parse(String(r?.body ?? '{}'));
+}
+
+async function code(url: string, headers: Record<string, string>): Promise<string> {
+  try {
+    const r: any = await harbor.http(url, { responseType: 'text', timeoutMs: 15000, headers } as any);
+    return String(r?.status ?? '?');
+  } catch (_) {
+    return 'ERR';
+  }
 }
 
 function atsuCover(raw: any): string {
@@ -16,64 +39,37 @@ function atsuCover(raw: any): string {
   return CDN + (t.startsWith('/') ? t : '/static/' + t);
 }
 
-function px(u: string): string {
-  return 'https://wsrv.nl/?url=' + encodeURIComponent(u) + '&w=300&output=jpg';
-}
-
-function findUploadUrl(body: string): string {
-  const i = body.indexOf('/wp-content/uploads/');
-  if (i < 0) return '';
-  const start = body.lastIndexOf('http', i);
-  if (start < 0) return '';
-  const ends = ['"', "'", ' ', ')'].map((ch) => body.indexOf(ch, i)).filter((x) => x > 0);
-  if (ends.length === 0) return '';
-  const url = body.slice(start, Math.min(...ends));
-  const lower = url.toLowerCase();
-  const ok = lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.webp');
-  return ok ? url : '';
-}
-
-async function touch(urls: Array<string | undefined>): Promise<void> {
-  const jobs: Array<Promise<any>> = [];
-  for (const u of urls) {
-    if (!u) continue;
-    jobs.push(get(u).catch(() => null));
-  }
-  await Promise.all(jobs);
-}
-
-async function rows(): Promise<MangaSummary[]> {
-  const out: MangaSummary[] = [];
-  out.push({ id: 'a', title: 'A wikimedia direct +T', cover: WIKI } as MangaSummary);
-  out.push({ id: 'b', title: 'B wikimedia via proxy +T', cover: px(WIKI) } as MangaSummary);
-
+async function lines(): Promise<string[]> {
+  const out: string[] = ['A=atsumaru cover W=wikimedia image'];
   let atsu = '';
   try {
-    const r = await get(API);
-    const j = JSON.parse(String(r?.body ?? '{}'));
+    const j = await getJson(API);
     const it = Array.isArray(j?.items) ? j.items[0] : null;
     atsu = atsuCover(it?.image);
   } catch (_) {}
-  if (atsu) {
-    out.push({ id: 'c', title: 'C atsumaru direct +T', cover: atsu } as MangaSummary);
-    out.push({ id: 'd', title: 'D atsumaru via proxy +T', cover: px(atsu) } as MangaSummary);
-  } else {
-    out.push({ id: 'c', title: 'C atsumaru API failed' } as MangaSummary);
+  if (!atsu) {
+    out.push('Atsumaru API failed');
+    return out;
   }
-
-  let thunder = '';
-  try {
-    const r = await get('https://en-thunderscans.com/');
-    thunder = findUploadUrl(String(r?.body ?? ''));
-  } catch (_) {}
-  out.push({
-    id: 'e',
-    title: thunder ? 'E thunderscans direct +T' : 'E thunderscans none found',
-    cover: thunder || undefined,
-  } as MangaSummary);
-
-  await touch(out.map((o) => o.cover));
+  for (const [label, headers] of VARIANTS) {
+    const [a, w] = await Promise.all([code(atsu, headers), code(WIKI, headers)]);
+    out.push(label + ': A' + a + ' W' + w);
+  }
   return out;
+}
+
+function toRows(ls: string[]): MangaSummary[] {
+  const out: MangaSummary[] = [];
+  for (const l of ls) {
+    for (let i = 0; i < l.length && out.length < 40; i += 34) {
+      out.push({ id: 'r' + out.length, title: l.slice(i, i + 34) } as MangaSummary);
+    }
+  }
+  return out;
+}
+
+async function rows(): Promise<MangaSummary[]> {
+  return toRows(await lines());
 }
 
 export const plugin: MangaProvider = {
