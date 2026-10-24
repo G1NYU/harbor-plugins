@@ -1,0 +1,9 @@
+{
+  "id": "probe",
+  "name": "Probe (diagnostic)",
+  "version": "0.0.1",
+  "lang": "en",
+  "nsfw": false,
+  "entry": "probe.plugin.js",
+  "description": "Diagnostic: shows how Harbor's HTTP requests fare against several sites"
+}
