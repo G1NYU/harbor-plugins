@@ -1,10 +1,10 @@
 {
   "id": "asura-seanime",
-  "name": "Asura Scans (Seanime port)",
-  "version": "0.0.1",
+  "name": "★ Asura Scans",
+  "version": "0.1.0",
   "lang": "en",
   "nsfw": false,
   "entry": "asura-seanime.plugin.js",
-  "description": "Test port of Pal's Seanime provider for asurascans.com (reads the site's Astro island data). First page only.",
+  "description": "The fan favourite, finally working in Harbor after a lot of failed attempts. Based on Pal's MIT-licensed Seanime provider. Browse shows the first page only.",
   "website": "https://asurascans.com"
 }

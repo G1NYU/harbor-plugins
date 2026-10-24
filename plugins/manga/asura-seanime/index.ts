@@ -150,7 +150,7 @@ function debugChapter(id: string, msg: string): MangaChapter {
 
 const plugin: MangaProvider = {
   id: 'asura-seanime',
-  name: 'Asura Scans (Seanime port)',
+  name: '★ Asura Scans',
 
   async popular(offset: number) {
     if (offset > 0) return [];

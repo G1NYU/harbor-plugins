@@ -6,6 +6,7 @@ const DIST = path.join(process.cwd(), 'dist', 'manga');
 // Display order in repo.json: pinned first, then approximate popularity.
 // Ids missing from this list are placed at the end.
 const ORDER = [
+  'asura-seanime',
   'weebcentral',
   'kaynscan',
   'projectsuki',
@@ -48,6 +49,7 @@ const ORDER = [
 
 // Proven sources: shown in repo.json
 const KEEP = new Set([
+  'asura-seanime',
   'flamecomics',
   'hivetoons',
   'weebcentral',
@@ -94,9 +96,7 @@ const EXTENDED = new Set<string>(['batcave', 'royalroad']);
 // Untested sources: shown in repo-testing.json (add ids here to try new ones)
 const TESTING = new Set<string>([
   'probe',
-  'asura-seanime',
   'mangasushi',
-  'asurascans',
 ]);
 
 // Testing sources that get no debug wrapper
