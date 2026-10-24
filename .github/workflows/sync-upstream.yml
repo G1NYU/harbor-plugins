@@ -45,24 +45,37 @@ jobs:
       - name: Validate All Manifests & Bundles
         run: npm run validate
 
+      - name: Update gate (hold back regressions)
+        timeout-minutes: 25
+        run: npm run gate
+
       - name: Open or update fallback alert
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [ -f dist/manga/sync-report.json ]; then
-            COUNT=$(jq '.restored | length' dist/manga/sync-report.json)
-            if [ "$COUNT" -gt 0 ]; then
-              LINES=$(jq -r '.restored[] | "- " + .id + " (v" + .version + "): " + .reason' dist/manga/sync-report.json)
+          REPORT=dist/manga/sync-report.json
+          if [ -f "$REPORT" ]; then
+            R=$(jq '(.restored // []) | length' "$REPORT")
+            H=$(jq '(.held // []) | length' "$REPORT")
+            if [ "$R" -gt 0 ] || [ "$H" -gt 0 ]; then
               {
-                echo "These sources could not be updated from upstream, so the last known good copy was kept:"
-                echo
-                echo "$LINES"
+                echo "Automatic safeguards kicked in during the latest sync."
+                if [ "$R" -gt 0 ]; then
+                  echo
+                  echo "Restored from last known good (upstream failed or removed them):"
+                  jq -r '.restored[] | "- " + .id + " (v" + .version + "): " + .reason' "$REPORT"
+                fi
+                if [ "$H" -gt 0 ]; then
+                  echo
+                  echo "Held back (the new version tested worse than the current one):"
+                  jq -r '.held[] | "- " + .id + ": kept v" + .oldVersion + ", skipped v" + .newVersion + " (score " + (.oldScore | tostring) + " -> " + (.newScore | tostring) + " out of 5)"' "$REPORT"
+                fi
               } > alert-body.md
               EXISTING=$(gh issue list --state open --search "Sync fallback in:title" --json number --jq '.[0].number // empty')
               if [ -n "$EXISTING" ]; then
                 gh issue comment "$EXISTING" --body-file alert-body.md
               else
-                gh issue create --title "Sync fallback: sources restored from last known good" --body-file alert-body.md
+                gh issue create --title "Sync fallback: sources restored or held back" --body-file alert-body.md
               fi
               rm -f alert-body.md
             fi

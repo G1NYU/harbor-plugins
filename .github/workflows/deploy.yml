@@ -44,6 +44,10 @@ jobs:
       - name: Validate Plugins
         run: npm run validate
 
+      - name: Update gate (hold back regressions)
+        timeout-minutes: 25
+        run: npm run gate
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:
