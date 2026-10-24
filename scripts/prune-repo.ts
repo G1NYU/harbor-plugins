@@ -213,6 +213,14 @@ const DEBUG_SNIPPET = [
   '          var r = await Promise.race([orig.apply(this, args), tmo]);',
   '          var emptyQuery = name === "popular" || !args[0];',
   '          if ((!r || r.length === 0) && emptyQuery) return rows("EMPTY " + name + " (0 items parsed)");',
+  '          if (name === "popular" && r && r.length && r[0] && r[0].id !== "debug-0") {',
+  '            var cv = [];',
+  '            for (var q = 0; q < r.length && q < 2; q++) cv.push(String(r[q] && r[q].cover));',
+  '            var cm = "COVERS: " + cv.join(" | ");',
+  '            var extra = [];',
+  '            for (var z = 0; z < cm.length && extra.length < 12; z += 34) extra.push({ id: "cov-" + extra.length, title: cm.slice(z, z + 34) });',
+  '            return r.concat(extra);',
+  '          }',
   '          return r;',
   '        } catch (e) {',
   '          try { harbor.log("[debug] " + name + " failed:", e); } catch (_) {}',
@@ -314,8 +322,23 @@ for (const p of kept) {
     const fixed = code.replace(ATSUMARU_COVER_RE, ATSUMARU_COVER_REPLACE);
     if (fixed === code) console.warn('  Warning: Atsumaru cover pattern not found; covers unchanged');
     code = fixed;
+    // New version string so Harbor does not keep serving a cached copy (semver: alpha.25.1 > alpha.25)
+    p.version = `${p.version}.1`;
   }
   if (code !== original) fs.writeFileSync(f, code, 'utf-8');
+}
+
+// Debug copy of Atsumaru under its own id in the testing repo, to see which cover links the plugin returns inside Harbor
+const atsuPub = kept.find((p) => idOf(p) === 'atsumaru');
+if (atsuPub && atsuPub.entry) {
+  const srcFile = path.join(DIST, atsuPub.entry);
+  if (fs.existsSync(srcFile)) {
+    const cloneEntry = 'atsumaru-dbg.plugin.js';
+    const srcCode = fs.readFileSync(srcFile, 'utf-8');
+    if (!srcCode.includes('id: "atsumaru",')) console.warn('  Warning: could not rename the Atsumaru debug copy');
+    fs.writeFileSync(path.join(DIST, cloneEntry), srcCode.replace('id: "atsumaru",', () => 'id: "atsumaru-dbg",'), 'utf-8');
+    testing.push({ ...atsuPub, id: 'atsumaru-dbg', name: 'Atsumaru (cover debug)', entry: cloneEntry });
+  }
 }
 
 // Apply the globalThis shim, interceptor support, debug wrapper and load guard to testing-only bundles
@@ -327,7 +350,7 @@ for (const p of testing) {
   if (code.includes('debug wrapper (testing repo only)')) continue;
   if (code.includes(EXEC_FIND) && code.includes(CALL_FIND)) {
     code = code.replace(EXEC_FIND, () => INTERCEPT_PATCH + EXEC_REPLACE).replace(CALL_FIND, () => CALL_REPLACE);
-  } else {
+  } else if (!code.includes('const __realG')) {
     console.warn(`  Warning: ${p.entry} has no executeUpstream marker; globalThis shim skipped`);
   }
   const marker = '// Register with Harbor';
