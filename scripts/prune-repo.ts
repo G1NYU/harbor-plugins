@@ -94,7 +94,6 @@ const EXTENDED = new Set<string>(['batcave', 'royalroad']);
 // Untested sources: shown in repo-testing.json (add ids here to try new ones)
 const TESTING = new Set<string>([
   'probe',
-  'kagane',
   'mangasushi',
   'asurascans',
 ]);
