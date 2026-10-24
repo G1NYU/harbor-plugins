@@ -1,6 +1,7 @@
 import type { MangaProvider, MangaSummary } from '@shared/types/manga.js';
 
 const BASE = 'https://legionscans.com';
+const NAV = ['/wp/', '/wp/marcador/', '/wp/az/', '/wp/blog/'];
 const UA =
   'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36';
 
@@ -69,8 +70,10 @@ function internalLinks(html: string): string[] {
     if (u.indexOf(BASE) !== 0) continue;
     const p = pathOf(u);
     if (p === '/' || p === '') continue;
+    if (NAV.indexOf(p) >= 0) continue;
     if (/\.(css|js|png|jpe?g|webp|svg|ico|xml|json|gif)(\?|$)/i.test(p)) continue;
     if (/wp-(content|json|admin|includes)|\/feed|xmlrpc/i.test(p)) continue;
+    if (/\/(page|category|tag|author|genre|genres)\//i.test(p)) continue;
     if (seen[u]) continue;
     seen[u] = true;
     out.push(u);
@@ -78,52 +81,33 @@ function internalLinks(html: string): string[] {
   return out;
 }
 
-function imageUrls(html: string): string[] {
-  const re = /<img[^>]+?(?:data-src|src)="(https?:\/\/[^"]+)"/gi;
-  const seen: Record<string, boolean> = {};
-  const out: string[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(html)) !== null) {
-    if (seen[m[1]]) continue;
-    seen[m[1]] = true;
-    out.push(m[1]);
-  }
-  return out;
-}
-
 async function run(): Promise<MangaSummary[]> {
-  const out: string[] = ['PROBE5 v0.0.2 legion'];
-  const home = await step('HOME /', BASE + '/', out);
-  if (!home) return rows(out.concat('NO HOME PAGE, stop'));
+  const out: string[] = ['PROBE6 v0.0.3 legion'];
+  const az = await step('AZ /wp/az/', BASE + '/wp/az/', out);
+  if (!az) return rows(out.concat('NO AZ PAGE, stop'));
 
-  const links = internalLinks(home);
-  out.push('internal links: ' + links.length);
-  for (let i = 0; i < links.length && i < 4; i++) out.push('L' + (i + 1) + ' ' + pathOf(links[i]));
+  const links = internalLinks(az);
+  out.push('links: ' + links.length);
+  for (let i = 0; i < links.length && i < 6; i++) out.push('L' + (i + 1) + ' ' + pathOf(links[i]));
+  if (links.length === 0) return rows(out);
 
-  const imgs = imageUrls(home);
-  out.push('images: ' + imgs.length);
-  for (let i = 0; i < imgs.length && i < 3; i++) {
-    out.push('I' + (i + 1) + ' ' + host(imgs[i]));
-    await step('IMG' + (i + 1), imgs[i], out);
-  }
-
-  const cands = links.filter((u) => {
-    const p = pathOf(u);
-    return p.split('/').filter(Boolean).length >= 2 && !/\/(page|category|tag|author|genre|genres)\//i.test(p);
-  });
-  if (cands.length === 0) return rows(out.concat('no series candidate'));
-  out.push('series cand:');
-  out.push(pathOf(cands[0]));
-
-  const sp = await step('SERIES pg', cands[0], out);
+  out.push('series:');
+  out.push(pathOf(links[0]));
+  const sp = await step('SERIES pg', links[0], out);
   if (!sp) return rows(out);
   out.push('eph-num: ' + (sp.match(/eph-num/g) || []).length);
+  out.push('clstyle: ' + (sp.match(/clstyle/g) || []).length);
   out.push('data-num: ' + (sp.match(/data-num=/g) || []).length);
+
   let chUrl = '';
   const c1 = /class="eph-num">\s*<a[^>]+href="([^"]+)"/i.exec(sp);
-  const c2 = /href="([^"]*(?:chapter|capitulo)[^"]*)"/i.exec(sp);
-  if (c1) chUrl = toAbs(c1[1]);
-  else if (c2) chUrl = toAbs(c2[1]);
+  if (c1) {
+    chUrl = toAbs(c1[1]);
+  } else {
+    const sl = internalLinks(sp).filter((u) => u !== links[0] && /chapter|capitulo|cap[-_]?\d/i.test(pathOf(u)));
+    out.push('chapter-like links: ' + sl.length);
+    if (sl.length) chUrl = sl[0];
+  }
   if (!chUrl) return rows(out.concat('no chapter link'));
   out.push('chapter:');
   out.push(pathOf(chUrl));
@@ -132,6 +116,8 @@ async function run(): Promise<MangaSummary[]> {
   if (!ch) return rows(out);
   const flat = ch.replace(/\\\//g, '/');
   out.push('readerarea: ' + (flat.indexOf('readerarea') >= 0 ? 'yes' : 'NO'));
+  out.push('ts_reader: ' + (flat.indexOf('ts_reader') >= 0 ? 'yes' : 'NO'));
+  out.push('img tags: ' + (flat.match(/<img/g) || []).length);
   let pageImg = '';
   const s1 = /"sources":\s*\[[\s\S]*?"images":\s*\[\s*"([^"]+)"/.exec(flat);
   const s2 = /id="readerarea"[\s\S]*?<img[^>]+?(?:data-src|src)="(https?:[^"]+)"/i.exec(flat);
@@ -147,8 +133,8 @@ async function run(): Promise<MangaSummary[]> {
 }
 
 const plugin: MangaProvider = {
-  id: 'probe5',
-  name: 'Probe5 Legion v0.0.2 (diag)',
+  id: 'probe6',
+  name: 'Probe6 Legion v0.0.3 (diag)',
 
   async popular(offset: number) {
     if (offset > 0) return [];
