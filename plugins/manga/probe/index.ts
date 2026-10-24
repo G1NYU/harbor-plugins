@@ -3,57 +3,83 @@ import type { MangaProvider, MangaSummary } from '@shared/types/manga.js';
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
 
-const TARGETS: Array<[string, string]> = [
-  ['mangakatana', 'https://mangakatana.com/'],
-  ['thunderscans', 'https://en-thunderscans.com/'],
-  ['atsumaru', 'https://atsu.moe/'],
-  ['vortexscans', 'https://vortexscans.org/'],
-  ['hijala', 'https://en-hijala.com/'],
-  ['weebcentral', 'https://weebcentral.com/'],
-  ['mangapill', 'https://mangapill.com/'],
-];
+const API =
+  'https://atsu.moe/api/home2/mostBookmarked?offset=0&limit=5&mediums=Comic&types=Manga,Manwha,Manhua,OEL&contentRatings=Safe,Suggestive,Erotica&timeframe=weekly';
+const CDN = 'https://cdn.atsu.moe';
 
-async function hit(url: string, withHeaders: boolean): Promise<string> {
-  const t0 = Date.now();
-  try {
-    const opts: any = { responseType: 'text', timeoutMs: 15000 };
-    if (withHeaders) {
-      opts.headers = {
-        'User-Agent': UA,
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-      };
-    }
-    const r: any = await harbor.http(url, opts);
-    const body = String(r?.body ?? '');
-    const cf = body.includes('Just a moment...') || body.includes('cf-turnstile') || body.includes('challenge-platform');
-    return String(r?.status ?? '?') + (cf ? ' CF' : '') + ' ' + Math.round(body.length / 1024) + 'KB ' + (Date.now() - t0) + 'ms';
-  } catch (e: any) {
-    return 'ERR ' + String(e?.message ?? e).slice(0, 40);
-  }
+async function get(url: string, headers?: Record<string, string>): Promise<any> {
+  const opts: any = { responseType: 'text', timeoutMs: 15000 };
+  if (headers) opts.headers = headers;
+  return harbor.http(url, opts);
 }
 
-async function echo(): Promise<string> {
+function coverUrl(raw: any): string {
+  const t = typeof raw === 'string' ? raw : raw?.posterMedium ?? raw?.posterSmall ?? raw?.poster;
+  if (!t || typeof t !== 'string') return '';
+  if (t.startsWith('http')) return t;
+  return CDN + (t.startsWith('/') ? t : '/static/' + t);
+}
+
+function brief(r: any): string {
+  const h = r?.headers ?? {};
+  const ct = String(h['content-type'] ?? h['Content-Type'] ?? '?').slice(0, 20);
+  return String(r?.status ?? '?') + ' ' + Math.round(String(r?.body ?? '').length / 1024) + 'KB ' + ct;
+}
+
+function errText(e: any): string {
+  return String(e?.message ?? e).slice(0, 60);
+}
+
+async function lines(): Promise<string[]> {
+  const out: string[] = [];
+  let item: any = null;
   try {
-    const r: any = await harbor.http('https://httpbin.org/headers', { responseType: 'text', timeoutMs: 15000 });
+    const r = await get(API);
+    out.push('API: ' + brief(r));
     const j = JSON.parse(String(r?.body ?? '{}'));
-    const h = j.headers ?? {};
-    return 'UA=' + String(h['User-Agent'] ?? 'none').slice(0, 70) + ' | headers=' + Object.keys(h).join(',');
+    const items = Array.isArray(j?.items) ? j.items : [];
+    out.push('items: ' + items.length);
+    item = items[0] ?? null;
   } catch (e: any) {
-    return 'ERR ' + String(e?.message ?? e).slice(0, 40);
+    out.push('API ERR ' + errText(e));
   }
+  if (!item) return out;
+
+  out.push('keys: ' + Object.keys(item).join(','));
+  const raw = item.mediumImage ?? item.smallImage ?? item.image;
+  out.push('raw: ' + JSON.stringify(raw === undefined ? null : raw).slice(0, 80));
+  const url = coverUrl(raw);
+  out.push('url: ' + url);
+  if (!url) return out;
+
+  const tests: Array<[string, Record<string, string> | undefined]> = [
+    ['default', undefined],
+    ['referer', { Referer: 'https://atsu.moe/' }],
+    ['ref+UA', { Referer: 'https://atsu.moe/', 'User-Agent': UA, Accept: 'image/avif,image/webp,image/*,*/*;q=0.8' }],
+  ];
+  for (const [label, h] of tests) {
+    try {
+      const r = await get(url, h);
+      out.push(label + ': ' + brief(r));
+    } catch (e: any) {
+      out.push(label + ' ERR ' + errText(e));
+    }
+  }
+  return out;
+}
+
+function toRows(ls: string[]): MangaSummary[] {
+  const out: MangaSummary[] = [];
+  for (const l of ls) {
+    for (let i = 0; i < l.length && out.length < 40; i += 34) {
+      out.push({ id: 'r' + out.length, title: l.slice(i, i + 34) } as MangaSummary);
+    }
+  }
+  return out;
 }
 
 async function rows(): Promise<MangaSummary[]> {
-  const out: MangaSummary[] = await Promise.all(
-    TARGETS.map(async ([name, url]) => {
-      const [plain, browser] = await Promise.all([hit(url, false), hit(url, true)]);
-      return { id: name, title: name + ' | default: ' + plain + ' | browser headers: ' + browser } as MangaSummary;
-    })
-  );
-  const e = await echo();
-  out.push({ id: 'echo', title: 'Harbor sends: ' + e } as MangaSummary);
-  return out;
+  return toRows(await lines());
 }
 
 export const plugin: MangaProvider = {
