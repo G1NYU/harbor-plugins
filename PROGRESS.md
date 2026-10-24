@@ -1,6 +1,6 @@
 # Progress log
 
-## Handoff (24 Oct 2026, 19:15) - read this first
+## Handoff (24 Oct 2026, 21:00) - read this first
 
 Repo: `G1NYU/harbor-plugins`, branch `main`. Everything is deployed to GitHub Pages by `.github/workflows/deploy.yml` (typecheck, build, validate, update gate, deploy). Deploys take roughly 10-20 minutes and no longer cancel each other (`cancel-in-progress: false`); pushes that only touch `*.md` files do not deploy.
 
@@ -8,37 +8,74 @@ Working agreements: every push needs the user's confirmation first (show the exa
 
 ### Rules learned (read before building anything)
 
-1. **Harbor keeps stale copies of a plugin under the same id.** Bumping the version did not help: Probe 0.0.7 kept running the 0.0.6 code even after a remove and reinstall. A new id (probe2, mangabuddy-io2, readall-native2, ...) gets a fresh file. Testing ids can match by prefix in `scripts/prune-repo.ts` (`TESTING_PREFIXES`, `DEBUG_SKIP_PREFIXES`, currently only `probe`), so renaming a diagnostic needs no edit there. Put the version in the plugin's name to spot a stale copy. A stale repo list in Harbor also makes installs of removed entries fail: remove and re-add the repo.
+1. **Harbor keeps stale copies of a plugin under the same id.** Bumping the version did not help: Probe 0.0.7 kept running the 0.0.6 code even after a remove and reinstall. A new id (probe2, mangabuddy-io2, readall-native2, ...) gets a fresh file. Testing ids can match by prefix in `scripts/prune-repo.ts` (`TESTING_PREFIXES`, `DEBUG_SKIP_PREFIXES`, currently only `probe`), so renaming a diagnostic needs no edit. Put the version in the plugin's name to spot a stale copy. A stale repo list in Harbor also makes installs of removed entries fail: remove and re-add the repo.
 2. **`harbor.http` strips Cookie and Referer.** Probe 0.0.7 echo test against httpbin.org: Cookie and Referer never arrived, with or without `allowCookie` / `allowReferer` set to a value or a host (the option names exist in `shared/types/harbor.d.ts`, their meaning is unknown). Not yet tested: whether User-Agent, Origin or Accept get through. Consequence: the earlier Probe 0.0.6 header test (every setup returned 200) proved nothing about Referer or Origin, so the sentence "the failure does not depend on headers a plugin can set" in the Discord report is not supported.
 3. **A site is only portable if its image host answers a plain request.** Check the cover and page image hosts with a plain request (`diag`-style probe) before writing a port. MangaBuddy failed this check after the whole port was written. Also check that the site loads in a normal browser first (ReadAllComics did not).
 4. **Cloudflare cannot be solved from a plugin.** A plain `harbor.http` request that hits a Cloudflare check makes Harbor open its own check window (seen for readcomicsonline.ru and zipcomic.com), but plugin requests do not get the cleared cookie afterwards.
-5. **Plain HTML or JSON scrapers port well.** The native Asura Scans port (from Pal's MIT Seanime provider) worked on the first try, where the Paperback conversion never did.
+5. **Plain HTML or JSON scrapers port well.** The native Asura Scans port (from Pal's MIT Seanime provider) worked on the first try, where the Paperback conversion never did. Legion Scans, a WordPress theme scraped with regex, also worked.
 6. **Make test plugins fail fast.** If a plugin call takes too long Harbor shows "source did not respond" or "aborted" with no detail. Put short timeouts (8 s) and a hard guard around every request so an error row appears instead.
+7. **Probes must discover, not guess.** Print the first link paths and image hosts of a page before following a link. Every wrong guess costs a full deploy; Legion needed four rounds (Probe4 to Probe7).
+8. **Publishing needs one edit in `scripts/prune-repo.ts`.** A new id must be in `KEEP` and `ORDER`, otherwise it is built and then removed from every repo. Ids starting with `probe` land in the testing repo with no edit and no debug wrapper. Test under a `probe...` id, then publish under a clean new id.
 
 ### State of the repos
 
-- `manga/repo.json` (main, about 39 sources): includes `★ Asura Scans` (`asura-seanime` v0.1.0), pinned first.
+- `manga/repo.json` (main, about 40 sources): includes `★ Asura Scans` (`asura-seanime` v0.1.0) pinned first and `Legion Scans` (`legion-scans` v0.1.0, Spanish) second.
 - `manga/repo-extended.json`: main + BatCave + Royal Road.
-- `manga/repo-testing.json`: Probe3 (diagnostic, no longer needed), Mangasushi, Atsumaru (cover debug).
+- `manga/repo-testing.json`: Probe7 (Legion diagnostic, no longer needed), Mangasushi, Atsumaru (cover debug).
 
-Key files: `scripts/prune-repo.ts` (what is published, plus all test tooling), `public/index.html` (the Pages site, Known issues card), `plugins/manga/probe/` (diagnostic plugin; its manifest id changes per round), `plugins/manga/asura-seanime/` (published), `plugins/manga/mangabuddy-io/` and `plugins/manga/readall-native/` (parked native test plugins, built but not in any repo), `shared/types/harbor.d.ts` (the host bridge as Harbor documents it: `http`, `parseHtml`, `extractJson`, `grpc`, `getPreference`), `shared/types/ebook.ts` (Harbor also has an eBook plugin type).
+Key files: `scripts/prune-repo.ts` (what is published, plus all test tooling), `public/index.html` (the Pages site, Known issues card), `plugins/manga/probe/` (diagnostic plugin; its manifest id changes per round, now probe7), `plugins/manga/asura-seanime/` and `plugins/manga/legion-es/` (published native plugins), `plugins/manga/mangabuddy-io/` and `plugins/manga/readall-native/` (parked native test plugins, built but not in any repo), `shared/types/harbor.d.ts` (the host bridge as Harbor documents it: `http`, `parseHtml`, `extractJson`, `grpc`, `getPreference`), `shared/types/ebook.ts` (Harbor also has an eBook plugin type).
 
 Latest commits, newest first:
 
-- (this commit) testing lists cleaned up; notes.
+- (this commit) docs: Legion Scans published, Probe results, new rules.
+- `6a4893e` publish Legion Scans as `legion-scans` (manifest id, plugin id, `KEEP` and `ORDER` in `scripts/prune-repo.ts`).
+- `d084a22` Legion Scans native plugin 0.1.0 under the test id `probe-legion1`.
+- `a79a9fd` Probe7 (catalogue, series, dated chapter, page image: all passed).
+- `0edef56` Probe6 (A-Z page; followed the wrong link).
+- `cb82e56` Probe5 (home page links and images; followed the wrong link).
+- `27889c6` Probe4 (first Legion probe; series link regex missed).
+- `a02b293` and earlier: see the list below.
 - `99f10ad`, `a816004` ReadAllComics native test plugin (0.0.1, 0.0.2).
 - `55604ad` docs and Probe3.
 - `c321e99`, `04fe791`, `675bfc1` MangaBuddy native test plugin (0.0.1 to 0.0.3) and prefix matching for testing ids.
 - `5396119`, `1ca4e2d` Probe renamed to probe2; Probe 0.0.7.
 - `92847b9` Asura Scans moved to the main repo as `★ Asura Scans`.
 - `a2067a9` deploy workflow no longer cancels running deploys; markdown-only pushes skip it.
-- Earlier on 24 Oct: Kagane removed from testing (`771b83f`), the Asura Seanime port, Probe 0.0.4 to 0.0.6, the Atsumaru debug copy, the `globalThis` shim, Mangapill removed from main (`5fdac30`).
+- Earlier on 24 Oct: Kagane removed from testing (`771b83f`), the Asura Seanime port, Probe 0.0.4 to 0.0.6 (the earlier probe plugin versions), the Atsumaru debug copy, the `globalThis` shim, Mangapill removed from main (`5fdac30`).
 
 ## Results and decisions
 
 ### Asura Scans: done
 
 Native port of Pal's MIT Seanime provider (`plugins/manga/asura-seanime/`, MIT notice in the header). Works perfectly in Harbor (user report, 24 Oct 17:05), in the main repo as `★ Asura Scans`, pinned first. It reads `asurascans.com/browse` (first page only, about 20 of 357 series), series pages from `og:` tags, chapters from `/comics/<slug>/chapter/<n>` links and reader pages from the page's `ChapterReader` props. Possible follow-ups: pagination, a proper description.
+
+### Legion Scans (Spanish): done, published
+
+Site: legionscans.com, shown as Cerberus Series, a WordPress comics theme under `/wp/`. Reference: `branrgx/seanime-extensions`, `src/CerberusSeries/main.ts` (no LICENSE file in that repo; the user has the author's permission; the plugin header credits him). The old provider's selectors and URL patterns were partly out of date, so the plugin was written from probe results.
+
+Probe results (all with plain `harbor.http` requests, user-read rows):
+
+- Probe4: home `/` and `/wp/` both 200, 228KB (same page). Series link regex found nothing. First image on the page is on `sp-ao.shortpixel.ai` (200).
+- Probe5: 132 internal links on the home page; nav links are `/wp/`, `/wp/marcador/` (bookmarks), `/wp/az/`, `/wp/blog/`. 49 images, hosts ShortPixel and Jetpack (`i0.wp.com`, `i3.wp.com`), all 200. The probe followed `/wp/marcador/` by mistake.
+- Probe6: `/wp/az/` is a filter page (`?show=A` and so on), the first link was `/wp/comics/` (latest updates). Wrong follow again.
+- Probe7: `/wp/manga/` 200, 191KB, 31 series links (`/wp/manga/<slug>/`). A series page has 107 `eph-num`, 103 `data-num` rows and 103 dated chapter links (`/wp/YYYY/MM/DD/<n>-<id>/`). The chapter page has `readerarea`, `ts_reader`, a `sources` JSON, and its first image is on `i2.wp.com` (200, 248KB). Everything passed.
+
+Plugin: `plugins/manga/legion-es/` (id `legion-scans`, 0.1.0, lang `es`). Browse reads `/wp/manga/` (first page only), search uses `/wp/?s=` (untested), details come from `og:` tags, chapters from `<li data-num>` rows (fallback: dated links), pages from the `images` array of the reader's `ts_reader` JSON (fallback: `#readerarea` images). First published as the test copy `probe-legion1` (commit `d084a22`); the user said it works. Published as `legion-scans` in commit `6a4893e`, not re-tested yet.
+
+Open: grid covers (the Atsumaru problem may or may not apply), search, pagination of `/wp/manga/`.
+
+### Mangas.in (Spanish): not worth porting
+
+The provider (`branrgx/seanime-extensions`, `src/MangasIn/main.ts`) targets `m440.in`. Search is title only (`/search/?q=`). The chapter list depends on a Cloudflare Worker run by the author (`curly-haze-60fa.branrgx.workers.dev`) that decodes an obfuscated string from the series page. Every request sends a Referer, and the repo has no LICENSE file. Dropped in favour of Legion.
+
+### Pal's candidates read so far
+
+From `Seanime-contributions/Seanime-Providers`, `src/manga/` (MIT):
+
+- komiku: Indonesian, `komiku.org`, search on `api.komiku.org` (`/?post_type=manga&s=`), parsed with `LoadDoc` selectors (`div.bge`, `td.judulseries a`, `img.klazy.ww`), page images need no headers. Title search only, no browse list.
+- ravenscans: English, `ravenscans.org`, same WordPress theme family as Legion (`div.bsx`, `li data-num`, `#readerarea` with the images inside a `<noscript>` block), Referer sent on page images.
+- lelmanga: French, `lelmanga.com`, same theme family, Referer set to the chapter URL on page images.
+- Not read: mangafreak, mangahub, mangaball.
 
 ### Closed: BatCave, Kagane, MangaBuddy, western comic sites
 
@@ -49,7 +86,7 @@ Native port of Pal's MIT Seanime provider (`plugins/manga/asura-seanime/`, MIT n
 
 ### Grid covers (Atsumaru, Mangapill)
 
-Atsumaru's `image` JPEG cover links are valid and `harbor.http` fetches them with 200, but the browse grid shows a gradient, and "View image" gave "image request failed 400" once. Mangapill showed the same. Probe 0.0.6 (ten header setups, all 200) is weak evidence (see rule 2). The Discord report was posted; no reply as of 24 Oct 16:13. Idea for a follow-up post: ask what headers the grid request sends, whether plugins can send Referer or Cookie at all, and whether Cloudflare clearance is shared with plugin requests. Unchecked angle: Asura's cover host and whether Asura's covers draw in the grid.
+Atsumaru's `image` JPEG cover links are valid and `harbor.http` fetches them with 200, but the browse grid shows a gradient, and "View image" gave "image request failed 400" once. Mangapill showed the same. Probe 0.0.6 (ten header setups, all 200) is weak evidence (see rule 2). The Discord report was posted; no reply as of 24 Oct 16:13. The correction (draft in HANDOFF.md) is not posted yet. Idea for a follow-up post: ask what headers the grid request sends, whether plugins can send Referer or Cookie at all, and whether Cloudflare clearance is shared with plugin requests. Unchecked angle: Asura's cover host and whether Asura's covers draw in the grid. New angle: do Legion's covers (Jetpack and ShortPixel hosts) draw in the grid?
 
 ### Discord report (posted)
 
@@ -87,11 +124,11 @@ Harbor version: ___   OS: ___
 
 ## Other ecosystems checked
 
-Seanime (`5rahim/seanime`, GPL-3.0) is not installable in Harbor: providers are JS/TS classes with `search`, `findChapters`, `findChapterPages`, no browse list. Its community index `Bas1874/Seanime-Marketplace` must not be copied or re-hosted (its README forbids it; only read the raw link). Individual extension code is a separate matter: `Seanime-contributions/Seanime-Providers` (Pal, MIT, Copyright (c) 2025 Pal) allows ports with the MIT notice kept. Its `src/manga/` folder: MangaWorldAdult, animesama, asurascans, atsumaru, fanfox, komiku, kuramanga, lelmanga, mangaball, mangabuddy, mangadot, mangafire, mangafreak, mangahub, mangakatana, manganato, mynimekumanga, ravenscans, taiyo, xcomic. Read so far: asurascans (ported), atsumaru, manganato (targets mangabats.com, Referer on every request, title search only), mangabuddy (targets mangak.io), mangafire (needs a three-stage signing function for every API call). Other Seanime providers seen but not read: Mangapill, WeebCentral (Island), nhentai (nnotwen), baozimh (Elisoar111), Mangas.in (branrgx, Spanish). Anime torrent, streaming and UI plugins in the index are not useful for a manga reader; no ebook type was seen.
+Seanime (`5rahim/seanime`, GPL-3.0) is not installable in Harbor: providers are JS/TS classes with `search`, `findChapters`, `findChapterPages`, no browse list. Its community index `Bas1874/Seanime-Marketplace` must not be copied or re-hosted (its README forbids it; only read the raw link). Individual extension code is a separate matter: `Seanime-contributions/Seanime-Providers` (Pal, MIT, Copyright (c) 2025 Pal) allows ports with the MIT notice kept. Its `src/manga/` folder: MangaWorldAdult, animesama, asurascans, atsumaru, fanfox, komiku, kuramanga, lelmanga, mangaball, mangabuddy, mangadot, mangafire, mangafreak, mangahub, mangakatana, manganato, mynimekumanga, ravenscans, taiyo, xcomic. Read so far: asurascans (ported), atsumaru, manganato (targets mangabats.com, Referer on every request, title search only), mangabuddy (targets mangak.io), mangafire (needs a three-stage signing function for every API call), komiku, ravenscans, lelmanga. Other Seanime providers seen but not read: Mangapill, WeebCentral (Island), nhentai (nnotwen), baozimh (Elisoar111), Mangas.in (branrgx, Spanish; read, not worth porting), Cerberus Series (branrgx, Spanish; the base of Legion Scans). Anime torrent, streaming and UI plugins in the index are not useful for a manga reader; no ebook type was seen.
 
 Mangayomi: the original `kodjodevf/mangayomi-extensions` repo was archived on 3 Dec 2025. The fork `tympanicblock61/mangayomi-extensions` works as a repo in Harbor (user report) but only Weeb Central works; MangaDot worked once and could not be reproduced. Its JS sources: comix, kagane, mangadot, bato, mangafire, weebcentral.
 
-Spanish sources (seen, none tested, not started): Mangas.in (Seanime index, branrgx, TypeScript); Mangayomi Dart entries BarManga, Coco Rip, Emperor Scan, Inmortal Scan (all `es`).
+Spanish sources: Legion Scans is done. Mangas.in is dropped. The Mangayomi Dart entries BarManga, Coco Rip, Emperor Scan and Inmortal Scan (all `es`) are Dart, which Harbor does not run, so they are not usable.
 
 ## Debug tooling (testing repo)
 
@@ -106,19 +143,19 @@ Spanish sources (seen, none tested, not started): Mangas.in (Seanime index, bran
 ## Runtime facts about Harbor
 
 - No usable `globalThis`, `self`, `window` or `document`. Many Paperback 0.9 bundles assign `globalThis.App`; `scripts/prune-repo.ts` runs published bundles with a shim (`SHIM_PUBLISHED`: Thunderscans, MangaKatana, MangaDemon, VortexScans, Atsumaru). TODO: move this into `shared/adapter/paperback-runtime.ts`.
-- Native sources (Hijala, ManhwaNex, Asura Scans) never touch `globalThis` and worked from the start.
+- Native sources (Hijala, ManhwaNex, Asura Scans, Legion Scans) never touch `globalThis` and worked from the start.
 - Plugins can only hand Harbor bare image links and cannot attach headers to images.
 - `harbor.http` strips Cookie and Referer (rule 2). `Application.executeInWebView` does not exist.
 - The "All Extensions" view mixes results of every installed source. Share links look like `harbor://detail/manga/<plugin id>::<series id>`. Harbor can install Mangayomi repos.
 
 ## Published to the main manga repo
 
-Asura Scans (pinned first), Atsumaru, Hijala, ManhwaNex, Thunderscans, MangaKatana, MangaDemon, VortexScans and the older proven sources. Known issues (also on the Pages site): Atsumaru has no grid covers; VortexScans has chapters from sites that do not open; MangaDemon only opens some chapters. Mangapill was removed (covers).
+Asura Scans (pinned first), Legion Scans (Spanish, second), Atsumaru, Hijala, ManhwaNex, Thunderscans, MangaKatana, MangaDemon, VortexScans and the older proven sources. Known issues (also on the Pages site once its card is updated): Atsumaru has no grid covers; VortexScans has chapters from sites that do not open; MangaDemon only opens some chapters; Legion Scans browse shows the first page only and its search is untested. Mangapill was removed (covers).
 
 ## Next
 
-1. Post a short correction and two questions in the Discord thread (what headers plugins can send; whether the cleared Cloudflare cookie reaches plugin requests). Wait for the developers' reply on the grid-cover rule.
-2. Spanish sources: read Mangas.in's source (find its repo from the Seanime index). Before writing anything: confirm the site loads in a browser and run the image-host check.
-3. Port candidates from Pal's repo that pass those checks: komiku, ravenscans, mangafreak, lelmanga, mangahub, mangaball (none read yet). Keep Pal's MIT notice.
-4. Cleanups still open: delete `plugins/manga/kagane/` (and the parked `mangabuddy-io` and `readall-native` folders if they are not wanted as reference); remove the stale Probe/Probe2/Probe3 entries from Harbor by reinstalling the testing repo; once the cover question is settled remove the "Atsumaru (cover debug)" copy and the cover-contact snippet; move the `globalThis` shim into the converter.
-5. Optional: test whether User-Agent, Origin and Accept reach the server through `harbor.http`; paginate Asura's browse page.
+1. Check Legion Scans in Harbor after the last deploy: grid covers, series page, chapters, reader, search. Then paginate `/wp/manga/` and test search if needed.
+2. Post a short correction and two questions in the Discord thread (what headers plugins can send; whether the cleared Cloudflare cookie reaches plugin requests). Wait for the developers' reply on the grid-cover rule.
+3. Port candidates from Pal's repo that pass the checks: ravenscans, lelmanga, komiku (read), mangafreak, mangahub, mangaball (not read). Probe the image host first. Keep Pal's MIT notice.
+4. Optional: test whether User-Agent, Origin and Accept reach the server through `harbor.http`; paginate Asura's browse page.
+5. Cleanups still open: delete `plugins/manga/kagane/` (and the parked `mangabuddy-io` and `readall-native` folders if they are not wanted as reference); empty out `plugins/manga/probe/` (Probe7) once Legion is confirmed; remove the stale Probe entries from Harbor by reinstalling the testing repo; once the cover question is settled remove the "Atsumaru (cover debug)" copy and the cover-contact snippet; move the `globalThis` shim into the converter.
