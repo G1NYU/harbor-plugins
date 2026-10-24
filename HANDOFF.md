@@ -1,4 +1,4 @@
-# Handoff for a new chat (24 Oct 2026, 22:00)
+# Handoff for a new chat (24 Oct 2026, 22:20)
 
 Paste this into a new conversation: "Read HANDOFF.md and then PROGRESS.md in G1NYU/harbor-plugins first (GitHub connector). Then tell me the state in five lines and wait for my pick from the Next list."
 
@@ -19,12 +19,14 @@ Paste this into a new conversation: "Read HANDOFF.md and then PROGRESS.md in G1N
 
 - Published and working: many sources in the main repo. `★ Asura Scans` (`plugins/manga/asura-seanime/`) is pinned first. It is a native port of Pal's MIT-licensed Seanime provider and worked on the first try.
 - `Legion Scans` (Spanish, legionscans.com, site name Cerberus Series), folder `plugins/manga/legion-es/`, id `legion-scans`, version 0.1.0, second in the main repo. Native plugin written from the site's markup, with branrgx's Cerberus provider as a reference (the repo has no LICENSE file; the user has the author's permission; the header credits him). The user confirmed that the published plugin works, including search. Browse shows the first page of `/wp/manga/` only (31 series); pagination is still open.
+- `Atsumaru` works in Harbor, but its browse-grid covers still do not render (same known issue as before). It stays in the main repo. The Pages Known issues card already says its grid covers do not work. No further Atsumaru cover work is planned for now.
 - The Pages site (`public/index.html`) was successfully updated, including the Legion lines in the Known issues card.
 - The Discord correction about the cover bug was dropped. The user decided not to post it.
 - Probe7 is retired: `plugins/manga/probe/` is now a stub with no `harbor.register` call. Kagane is deleted: `plugins/manga/kagane/` no longer exists.
+- Manga and manhwa work is closed for now. The next focus is eBooks. First candidate: Z-Library. Firefox addon: https://go-to-library.sk/soft/mozilla-addon-latest.xpi?2 . Example entry: https://z-lib.gd/book/arGojLb0rD/the-love-hypothesis.html?dsource=mostpopular .
 - Closed with reasons (details in PROGRESS.md): BatCave (Cloudflare 403, cleared cookie does not reach plugin requests), Kagane (needs a proxy and a webview), MangaBuddy (its image hosts refuse requests without a Referer), ReadAllComics, ReadComicsOnline and ZipComic (Cloudflare or unreachable). Judged not worth porting: Mangas.in (see PROGRESS.md).
 - Testing repo after the last deploy: Probe7 (retired stub), Mangasushi, Atsumaru (cover debug). Parked native test plugins stay in the repo as reference (`plugins/manga/mangabuddy-io/`, `plugins/manga/readall-native/`) but are built and then removed from every repo.
-- Latest code commit when this was written: this repair commit, which restored the real `HANDOFF.md` and `PROGRESS.md`, replaced Probe7 with a retired stub and deleted Kagane.
+- Latest docs commit when this was written: this Markdown-only update, which closed the manga/manhwa phase, recorded the eBook/Z-Library next step and the cleanup checklist.
 
 ## Rules learned the hard way
 
@@ -40,12 +42,39 @@ Paste this into a new conversation: "Read HANDOFF.md and then PROGRESS.md in G1N
 10. Publishing a source: a new id must be added to `KEEP` and `ORDER` in `scripts/prune-repo.ts`, otherwise it is built and then removed from every repo. Ids that start with `probe` go to the testing repo with no edit and no debug wrapper (native plugins). Test under a `probe...` id first, then publish under a clean new id.
 11. Never push a file whose content is a placeholder or a label. After a push that was meant to change content, read the file back and verify the real content arrived.
 
+## eBook phase (next)
+
+Manga and manhwa are done for now. The next project is eBooks.
+
+First candidate: Z-Library.
+
+- Firefox addon download: https://go-to-library.sk/soft/mozilla-addon-latest.xpi?2
+- Example book entry: https://z-lib.gd/book/arGojLb0rD/the-love-hypothesis.html?dsource=mostpopular
+
+First questions to answer before writing any plugin:
+
+1. What does the Firefox addon actually do (search, mirrors, login, download links)?
+2. Which Z-Library mirror/domain is stable for the user, and does it need login?
+3. What does a book page expose without JavaScript: title, author, cover, formats, download links?
+4. Does Harbor's eBook plugin type (`shared/types/ebook.ts`) support search, details and downloads in the way Z-Library needs?
+5. Are downloads direct files, or do they need a session/interstitial page?
+
+Do not write a plugin until these are checked. Probe first, then build.
+
+## Cleanup checklist
+
+- Delete `plugins/manga/probe/` (retired Probe7 stub).
+- Delete `plugins/manga/mangabuddy-io/` (parked native test plugin).
+- Delete `plugins/manga/readall-native/` (parked native test plugin).
+- Keep `plugins/manga/example-manga/` unless the user says otherwise.
+- Keep Atsumaru in the main repo; it works, but its grid covers do not render and this is already annotated on the Pages site.
+- Later, optional: move the `globalThis` shim from `scripts/prune-repo.ts` into `shared/adapter/paperback-runtime.ts`.
+
 ## Next, in the order the user liked
 
-1. Optional: paginate Legion's `/wp/manga/` catalogue. Search and the rest of Legion already work.
-2. More candidates from Pal's repo (`src/manga/`). Read so far: komiku (Indonesian, search only, page images need no headers), ravenscans (English, WordPress theme, Referer on page images, pages in a `<noscript>` block), lelmanga (French, Referer on page images). Not read: mangafreak, mangahub, mangaball. Probe the image host first for every one.
-3. Optional: paginate Asura's browse page (it shows about 20 of 357 series); test whether User-Agent, Origin and Accept reach the server.
-4. Cleanups still open: remove the "Atsumaru (cover debug)" copy once the cover question is settled; move the `globalThis` shim into `shared/adapter/paperback-runtime.ts`.
+1. Cleanups after user approval: delete `plugins/manga/probe/`, `plugins/manga/mangabuddy-io/`, `plugins/manga/readall-native/`.
+2. eBook research: Z-Library addon, mirrors, book-page structure, Harbor eBook plugin type, download flow.
+3. Later, optional: move the `globalThis` shim into `shared/adapter/paperback-runtime.ts`.
 
 ## Where to look
 
