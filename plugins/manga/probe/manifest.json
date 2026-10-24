@@ -1,9 +1,9 @@
 {
-  "id": "probe6",
-  "name": "Probe6 Legion v0.0.3 (diag)",
-  "version": "0.0.3",
+  "id": "probe7",
+  "name": "Probe7 Legion v0.0.4 (diag)",
+  "version": "0.0.4",
   "lang": "es",
   "nsfw": false,
-  "entry": "probe6.plugin.js",
-  "description": "Diagnostic: loads legionscans.com/wp/az/, lists the first series links, follows the first one to a series page, a chapter page and one page image, printing short status rows"
+  "entry": "probe7.plugin.js",
+  "description": "Diagnostic: loads legionscans.com/wp/manga/, follows the first /wp/manga/<slug>/ series page to a dated chapter post and one page image, printing short status rows"
 }
