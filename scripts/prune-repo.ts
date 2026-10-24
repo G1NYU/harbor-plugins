@@ -97,16 +97,20 @@ const TESTING = new Set<string>([
 // Testing sources that already work: no debug wrapper
 const DEBUG_SKIP = new Set<string>(['probe', 'hijala', 'manhwanex']);
 
-// Compat shim: many upstream bundles run globalThis.App = ..., but Harbor's runtime has no usable globalThis.
-// Give the bundle its own globalThis (reads fall through to the real one if present) and keep App in sync with a bare App variable.
+// Compat shim: many upstream bundles run globalThis.App = ... (or this.App / self.App), but Harbor's runtime has no usable globalThis/self.
+// Run the bundle as a normal function bound to its own global-like object (reads fall through to the real global if present)
+// and keep App in sync with a bare App variable.
 const EXEC_FIND = 'const __executeUpstream = (Application) => {';
 const EXEC_REPLACE = [
   'const __realG = (typeof globalThis === "object" && globalThis) ? globalThis : null;',
-  'const __executeUpstream = (Application) => {',
-  '  var globalThis = Object.create(__realG);',
+  'const __executeUpstream = function (Application) {',
+  '  var globalThis = this;',
+  '  var self = this;',
   '  var App;',
-  '  try { Object.defineProperty(globalThis, "App", { configurable: true, enumerable: true, get: function () { return App; }, set: function (v) { App = v; } }); } catch (_) {}',
+  '  try { Object.defineProperty(this, "App", { configurable: true, enumerable: true, get: function () { return App; }, set: function (v) { App = v; } }); } catch (_) {}',
 ].join('\n');
+const CALL_FIND = 'const __sourceModule = __executeUpstream(Application);';
+const CALL_REPLACE = 'const __sourceModule = __executeUpstream.call(Object.create(__realG), Application);';
 
 // Debug wrapper injected into testing-repo bundles: shows real errors as rows (cards cut text, so short rows)
 const DEBUG_SNIPPET = [
@@ -114,7 +118,20 @@ const DEBUG_SNIPPET = [
   '  (function () {',
   '    var lastReq = "";',
   '    var lastMsg = "";',
-  '    function errText(e) { var m = (e && e.message) ? e.message : String(e); return String(m).slice(0, 200); }',
+  '    function errText(e) {',
+  '      var m = (e && e.message) ? e.message : String(e);',
+  '      var fr = "";',
+  '      try {',
+  '        var ls = String((e && e.stack) || "").split("\\n").slice(1, 5);',
+  '        var parts = [];',
+  '        for (var i = 0; i < ls.length; i++) {',
+  '          var pos = ls[i].match(/<anonymous>:(\\d+:\\d+)/);',
+  '          if (pos) parts.push(pos[1]);',
+  '        }',
+  '        if (parts.length) fr = " @" + parts.join(",");',
+  '      } catch (_) {}',
+  '      return String(m).slice(0, 160) + fr;',
+  '    }',
   '    try {',
   '      var oh = harbor.http;',
   '      harbor.http = async function (u, o) {',
@@ -238,8 +255,8 @@ for (const p of testing) {
   if (!fs.existsSync(f)) continue;
   let code = fs.readFileSync(f, 'utf-8');
   if (code.includes('debug wrapper (testing repo only)')) continue;
-  if (code.includes(EXEC_FIND)) {
-    code = code.replace(EXEC_FIND, () => EXEC_REPLACE);
+  if (code.includes(EXEC_FIND) && code.includes(CALL_FIND)) {
+    code = code.replace(EXEC_FIND, () => EXEC_REPLACE).replace(CALL_FIND, () => CALL_REPLACE);
   } else {
     console.warn(`  Warning: ${p.entry} has no executeUpstream marker; globalThis shim skipped`);
   }
