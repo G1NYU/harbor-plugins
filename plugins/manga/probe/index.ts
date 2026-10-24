@@ -33,10 +33,19 @@ function findUploadUrl(body: string): string {
   return ok ? url : '';
 }
 
+async function touch(urls: Array<string | undefined>): Promise<void> {
+  const jobs: Array<Promise<any>> = [];
+  for (const u of urls) {
+    if (!u) continue;
+    jobs.push(get(u).catch(() => null));
+  }
+  await Promise.all(jobs);
+}
+
 async function rows(): Promise<MangaSummary[]> {
   const out: MangaSummary[] = [];
-  out.push({ id: 'a', title: 'A wikimedia direct', cover: WIKI } as MangaSummary);
-  out.push({ id: 'b', title: 'B wikimedia via proxy', cover: px(WIKI) } as MangaSummary);
+  out.push({ id: 'a', title: 'A wikimedia direct +T', cover: WIKI } as MangaSummary);
+  out.push({ id: 'b', title: 'B wikimedia via proxy +T', cover: px(WIKI) } as MangaSummary);
 
   let atsu = '';
   try {
@@ -46,8 +55,8 @@ async function rows(): Promise<MangaSummary[]> {
     atsu = atsuCover(it?.image);
   } catch (_) {}
   if (atsu) {
-    out.push({ id: 'c', title: 'C atsumaru direct', cover: atsu } as MangaSummary);
-    out.push({ id: 'd', title: 'D atsumaru via proxy', cover: px(atsu) } as MangaSummary);
+    out.push({ id: 'c', title: 'C atsumaru direct +T', cover: atsu } as MangaSummary);
+    out.push({ id: 'd', title: 'D atsumaru via proxy +T', cover: px(atsu) } as MangaSummary);
   } else {
     out.push({ id: 'c', title: 'C atsumaru API failed' } as MangaSummary);
   }
@@ -59,10 +68,11 @@ async function rows(): Promise<MangaSummary[]> {
   } catch (_) {}
   out.push({
     id: 'e',
-    title: thunder ? 'E thunderscans direct' : 'E thunderscans none found',
+    title: thunder ? 'E thunderscans direct +T' : 'E thunderscans none found',
     cover: thunder || undefined,
   } as MangaSummary);
 
+  await touch(out.map((o) => o.cover));
   return out;
 }
 

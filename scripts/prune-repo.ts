@@ -110,16 +110,41 @@ const SHIM_PUBLISHED = new Set<string>(['thunderscans', 'mangakatana', 'mangadem
 const ATSUMARU_COVER_RE = /(\w+)(\??\.)mediumImage\?\?\1\2smallImage\?\?\1\2image/g;
 const ATSUMARU_COVER_REPLACE = '$1$2image??$1$2mediumImage??$1$2smallImage';
 
-// Experiment (testing copy of Atsumaru only): send list covers through a public image proxy that fetches the image itself
-// and returns a small JPEG. Tells us whether covers fail because of the referer/host Harbor uses when loading them.
-const COVER_PROXY_FIND = 'cover: __absUrl(item.imageUrl || item.thumbnailUrl || item.cover)';
-const COVER_PROXY_REPLACE = 'cover: __px(__absUrl(item.imageUrl || item.thumbnailUrl || item.cover))';
-const MAPITEM_FIND = 'function __mapItem(item) {';
-const COVER_PROXY_FN = [
-  'function __px(u) {',
-  '  if (!u) return u;',
-  '  return "https://wsrv.nl/?url=" + encodeURIComponent(u) + "&w=300&output=jpg";',
-  '}',
+// Experiment (testing copies listed here only): Harbor seems to draw grid covers only from web hosts the plugin has already
+// contacted. Before a list is returned, download one cover per image host so Harbor has seen that host.
+const TOUCH_IDS = new Set<string>(['atsumaru-dbg']);
+const COVER_TOUCH_SNIPPET = [
+  '  // --- cover host contact (testing repo only) ---',
+  '  (function () {',
+  '    var seen = {};',
+  '    function originOf(u) {',
+  '      u = String(u || "");',
+  '      var i = u.indexOf("://");',
+  '      if (i < 0) return "";',
+  '      var j = u.indexOf("/", i + 3);',
+  '      return j < 0 ? u : u.slice(0, j);',
+  '    }',
+  '    async function touch(items) {',
+  '      if (!items || !items.length) return;',
+  '      var jobs = [];',
+  '      for (var i = 0; i < items.length; i++) {',
+  '        var c = items[i] && items[i].cover;',
+  '        var o = originOf(c);',
+  '        if (!o || seen[o]) continue;',
+  '        seen[o] = true;',
+  '        try { jobs.push(Promise.resolve(harbor.http(c, { method: "GET", responseType: "text", timeoutMs: 10000 })).catch(function () {})); } catch (_) {}',
+  '      }',
+  '      if (jobs.length) await Promise.all(jobs);',
+  '    }',
+  '    ["popular", "search"].forEach(function (name) {',
+  '      var orig = plugin[name];',
+  '      plugin[name] = async function () {',
+  '        var r = await orig.apply(this, arguments);',
+  '        try { await touch(r); } catch (_) {}',
+  '        return r;',
+  '      };',
+  '    });',
+  '  })();',
   '',
 ].join('\n');
 
@@ -339,24 +364,16 @@ for (const p of kept) {
   if (code !== original) fs.writeFileSync(f, code, 'utf-8');
 }
 
-// Debug copy of Atsumaru under its own id in the testing repo, to see which cover links the plugin returns inside Harbor.
-// This copy also sends list covers through the image proxy (experiment).
+// Debug copy of Atsumaru under its own id in the testing repo, to see which cover links the plugin returns inside Harbor
+// and to test the cover-host contact step.
 const atsuPub = kept.find((p) => idOf(p) === 'atsumaru');
 if (atsuPub && atsuPub.entry) {
   const srcFile = path.join(DIST, atsuPub.entry);
   if (fs.existsSync(srcFile)) {
     const cloneEntry = 'atsumaru-dbg.plugin.js';
-    let cloneCode = fs.readFileSync(srcFile, 'utf-8');
-    if (!cloneCode.includes('id: "atsumaru",')) console.warn('  Warning: could not rename the Atsumaru debug copy');
-    cloneCode = cloneCode.replace('id: "atsumaru",', () => 'id: "atsumaru-dbg",');
-    if (cloneCode.includes(COVER_PROXY_FIND) && cloneCode.includes(MAPITEM_FIND)) {
-      cloneCode = cloneCode
-        .replace(MAPITEM_FIND, () => COVER_PROXY_FN + MAPITEM_FIND)
-        .replace(COVER_PROXY_FIND, () => COVER_PROXY_REPLACE);
-    } else {
-      console.warn('  Warning: cover proxy markers not found in the Atsumaru debug copy');
-    }
-    fs.writeFileSync(path.join(DIST, cloneEntry), cloneCode, 'utf-8');
+    const srcCode = fs.readFileSync(srcFile, 'utf-8');
+    if (!srcCode.includes('id: "atsumaru",')) console.warn('  Warning: could not rename the Atsumaru debug copy');
+    fs.writeFileSync(path.join(DIST, cloneEntry), srcCode.replace('id: "atsumaru",', () => 'id: "atsumaru-dbg",'), 'utf-8');
     testing.push({ ...atsuPub, id: 'atsumaru-dbg', name: 'Atsumaru (cover debug)', entry: cloneEntry });
   }
 }
@@ -380,11 +397,12 @@ for (const p of testing) {
     continue;
   }
   const lineStart = code.lastIndexOf('\n', at) + 1;
-  const injected = code.slice(0, lineStart) + DEBUG_SNIPPET + code.slice(lineStart);
+  const touchPart = TOUCH_IDS.has(idOf(p)) ? COVER_TOUCH_SNIPPET : '';
+  const injected = code.slice(0, lineStart) + touchPart + DEBUG_SNIPPET + code.slice(lineStart);
   const guarded = 'try {\n' + injected + loadGuardTail(String(p.id), String(p.name));
   fs.writeFileSync(f, guarded, 'utf-8');
-  p.version = `${p.version}-dbg.i2`;
-  p.name = `${p.name} [dbg.i2]`;
+  p.version = `${p.version}-dbg.i3`;
+  p.name = `${p.name} [dbg.i3]`;
 }
 
 if (testing.length > 0) {

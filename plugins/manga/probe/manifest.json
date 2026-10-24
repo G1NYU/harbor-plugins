@@ -1,9 +1,9 @@
 {
   "id": "probe",
   "name": "Probe (diagnostic)",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "lang": "en",
   "nsfw": false,
   "entry": "probe.plugin.js",
-  "description": "Diagnostic: returns five series with differently hosted covers to see which ones Harbor draws"
+  "description": "Diagnostic: downloads each test cover once from the plugin, then returns five series to see which covers Harbor draws"
 }
