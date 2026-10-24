@@ -98,13 +98,15 @@ const TESTING = new Set<string>([
   'mangasushi',
 ]);
 
-// Testing ids that are matched by prefix, so a renamed diagnostic (probe4, readall-native2, ...) needs no edit here.
-// Harbor sometimes keeps serving an old copy of a plugin under the same id; a new id gets a fresh file.
-const TESTING_PREFIXES = ['probe', 'readall-native'];
+// Testing ids that are matched by prefix, so a renamed diagnostic (probe4, ...) or a new native test plugin needs no edit
+// to the sets above. Harbor sometimes keeps serving an old copy of a plugin under the same id; a new id gets a fresh file.
+// Parked native test plugins (plugins/manga/mangabuddy-io, plugins/manga/readall-native) are NOT listed here, so they
+// are built but removed from every repo. Add their prefix back to try them again.
+const TESTING_PREFIXES = ['probe'];
 
 // Testing sources that get no debug wrapper (native plugins show their own error rows)
 const DEBUG_SKIP = new Set<string>(['asura-seanime']);
-const DEBUG_SKIP_PREFIXES = ['probe', 'readall-native'];
+const DEBUG_SKIP_PREFIXES = ['probe'];
 
 // Published sources whose bundles need the globalThis shim (they assign globalThis.App at load)
 const SHIM_PUBLISHED = new Set<string>(['thunderscans', 'mangakatana', 'mangademon', 'vortexscans', 'atsumaru']);

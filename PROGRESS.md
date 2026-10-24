@@ -1,66 +1,55 @@
 # Progress log
 
-## Handoff (24 Oct 2026, 18:45) - read this first
+## Handoff (24 Oct 2026, 19:15) - read this first
 
 Repo: `G1NYU/harbor-plugins`, branch `main`. Everything is deployed to GitHub Pages by `.github/workflows/deploy.yml` (typecheck, build, validate, update gate, deploy). Deploys take roughly 10-20 minutes and no longer cancel each other (`cancel-in-progress: false`); pushes that only touch `*.md` files do not deploy.
 
 Working agreements: every push needs the user's confirmation first (show the exact files); Harbor cards cut text at about 34 characters, so diagnostics print short rows that are read in order, left to right.
 
-### Rules learned today (read before building anything)
+### Rules learned (read before building anything)
 
-1. **Harbor keeps stale copies of a plugin under the same id.** Bumping the version did not help: Probe 0.0.7 kept running the 0.0.6 code even after a remove and reinstall. A new id (probe2, mangabuddy-io2, ...) gets a fresh file. Testing ids now match by prefix in `scripts/prune-repo.ts` (`TESTING_PREFIXES`, `DEBUG_SKIP_PREFIXES`: `probe*`, `mangabuddy-io*`), so renaming needs no edit there. Put the version in the plugin's name to spot a stale copy.
+1. **Harbor keeps stale copies of a plugin under the same id.** Bumping the version did not help: Probe 0.0.7 kept running the 0.0.6 code even after a remove and reinstall. A new id (probe2, mangabuddy-io2, readall-native2, ...) gets a fresh file. Testing ids can match by prefix in `scripts/prune-repo.ts` (`TESTING_PREFIXES`, `DEBUG_SKIP_PREFIXES`, currently only `probe`), so renaming a diagnostic needs no edit there. Put the version in the plugin's name to spot a stale copy. A stale repo list in Harbor also makes installs of removed entries fail: remove and re-add the repo.
 2. **`harbor.http` strips Cookie and Referer.** Probe 0.0.7 echo test against httpbin.org: Cookie and Referer never arrived, with or without `allowCookie` / `allowReferer` set to a value or a host (the option names exist in `shared/types/harbor.d.ts`, their meaning is unknown). Not yet tested: whether User-Agent, Origin or Accept get through. Consequence: the earlier Probe 0.0.6 header test (every setup returned 200) proved nothing about Referer or Origin, so the sentence "the failure does not depend on headers a plugin can set" in the Discord report is not supported.
-3. **A site is only portable if its image host answers a plain request.** Check the cover and page image hosts with a plain request (`diag`-style probe) before writing a port. MangaBuddy failed this check after the whole port was written.
-4. **Cloudflare cannot be solved from a plugin.** Harbor can open its own check window, but plugin requests do not get the cleared cookie.
+3. **A site is only portable if its image host answers a plain request.** Check the cover and page image hosts with a plain request (`diag`-style probe) before writing a port. MangaBuddy failed this check after the whole port was written. Also check that the site loads in a normal browser first (ReadAllComics did not).
+4. **Cloudflare cannot be solved from a plugin.** A plain `harbor.http` request that hits a Cloudflare check makes Harbor open its own check window (seen for readcomicsonline.ru and zipcomic.com), but plugin requests do not get the cleared cookie afterwards.
 5. **Plain HTML or JSON scrapers port well.** The native Asura Scans port (from Pal's MIT Seanime provider) worked on the first try, where the Paperback conversion never did.
+6. **Make test plugins fail fast.** If a plugin call takes too long Harbor shows "source did not respond" or "aborted" with no detail. Put short timeouts (8 s) and a hard guard around every request so an error row appears instead.
 
 ### State of the repos
 
-- `manga/repo.json` (main, about 39 sources): now includes `★ Asura Scans` (`asura-seanime` v0.1.0), pinned first.
+- `manga/repo.json` (main, about 39 sources): includes `★ Asura Scans` (`asura-seanime` v0.1.0), pinned first.
 - `manga/repo-extended.json`: main + BatCave + Royal Road.
-- `manga/repo-testing.json`: Probe3 (diagnostic), MangaBuddy (mangak.io) 0.0.3 (parked), Mangasushi, ReadAllComics, ReadComicsOnline, ZipComic, Atsumaru (cover debug).
+- `manga/repo-testing.json`: Probe3 (diagnostic, no longer needed), Mangasushi, Atsumaru (cover debug).
 
-Key files: `scripts/prune-repo.ts` (what is published, plus all test tooling), `public/index.html` (the Pages site, Known issues card), `plugins/manga/probe/` (diagnostic plugin; its manifest id changes per round), `plugins/manga/asura-seanime/`, `plugins/manga/mangabuddy-io/`, `shared/types/harbor.d.ts` (the host bridge as Harbor documents it: `http`, `parseHtml`, `extractJson`, `grpc`, `getPreference`), `shared/types/ebook.ts` (Harbor also has an eBook plugin type).
+Key files: `scripts/prune-repo.ts` (what is published, plus all test tooling), `public/index.html` (the Pages site, Known issues card), `plugins/manga/probe/` (diagnostic plugin; its manifest id changes per round), `plugins/manga/asura-seanime/` (published), `plugins/manga/mangabuddy-io/` and `plugins/manga/readall-native/` (parked native test plugins, built but not in any repo), `shared/types/harbor.d.ts` (the host bridge as Harbor documents it: `http`, `parseHtml`, `extractJson`, `grpc`, `getPreference`), `shared/types/ebook.ts` (Harbor also has an eBook plugin type).
 
 Latest commits, newest first:
 
-- (this commit) docs; Probe3 for the western comic sites.
-- `c321e99` MangaBuddy 0.0.3: images through wsrv.nl, `diag` search.
-- `04fe791` MangaBuddy 0.0.2 (new id) and prefix matching for testing ids.
-- `675bfc1` MangaBuddy 0.0.1 native test plugin.
-- `5396119` Probe renamed to probe2 (stale-copy workaround).
-- `1ca4e2d` Probe 0.0.7 and three western comic sources in testing.
-- `92847b9` Asura Scans moved to the main repo as `★ Asura Scans`; the old Kodama Asura entry dropped.
-- `841d5e4`, `b989053` Asura (Seanime port) test plugin and notes.
-- `771b83f` Kagane removed from the testing repo.
+- (this commit) testing lists cleaned up; notes.
+- `99f10ad`, `a816004` ReadAllComics native test plugin (0.0.1, 0.0.2).
+- `55604ad` docs and Probe3.
+- `c321e99`, `04fe791`, `675bfc1` MangaBuddy native test plugin (0.0.1 to 0.0.3) and prefix matching for testing ids.
+- `5396119`, `1ca4e2d` Probe renamed to probe2; Probe 0.0.7.
+- `92847b9` Asura Scans moved to the main repo as `★ Asura Scans`.
 - `a2067a9` deploy workflow no longer cancels running deploys; markdown-only pushes skip it.
-- Earlier on 24 Oct: Probe 0.0.4 to 0.0.6, the Atsumaru debug copy, the `globalThis` shim, Mangapill removed from main (`5fdac30`).
+- Earlier on 24 Oct: Kagane removed from testing (`771b83f`), the Asura Seanime port, Probe 0.0.4 to 0.0.6, the Atsumaru debug copy, the `globalThis` shim, Mangapill removed from main (`5fdac30`).
 
 ## Results and decisions
 
 ### Asura Scans: done
 
-Native port of Pal's MIT Seanime provider (`plugins/manga/asura-seanime/`, MIT notice in the header). Works perfectly in Harbor (user report, 24 Oct 17:05), now in the main repo as `★ Asura Scans`, pinned first. It reads `asurascans.com/browse` (first page only, about 20 of 357 series), series pages from `og:` tags, chapters from `/comics/<slug>/chapter/<n>` links and reader pages from the page's `ChapterReader` props. Possible follow-ups: pagination, a proper description.
+Native port of Pal's MIT Seanime provider (`plugins/manga/asura-seanime/`, MIT notice in the header). Works perfectly in Harbor (user report, 24 Oct 17:05), in the main repo as `★ Asura Scans`, pinned first. It reads `asurascans.com/browse` (first page only, about 20 of 357 series), series pages from `og:` tags, chapters from `/comics/<slug>/chapter/<n>` links and reader pages from the page's `ChapterReader` props. Possible follow-ups: pagination, a proper description.
 
-### BatCave: not fixable from a plugin
+### Closed: BatCave, Kagane, MangaBuddy, western comic sites
 
-BatCave comes from the Paperback extension `karrot0/KakarotExtension` (`src/Batcave`, v1.8, still built upstream on 16 Oct); it is generated at build time, not stored in this repo (`EXTENDED` set in `scripts/prune-repo.ts`). Probe 0.0.7 (run as probe2): `batcave.biz` returns HTTP 403 with a 5 KB page, with default headers and with a browser User-Agent, and the page is neither the comic list nor the proof-of-work page the upstream code looks for (so the earlier proof-of-work guess was probably wrong; most likely a Cloudflare check). Harbor's check window opens and passes, but the plugin's own requests then still fail. An X post dated 20 Oct also reported a BatCave database outage (single source, not confirmed).
-
-### Kagane: not feasible
-
-Needs a user-run Cloudflare-impersonating proxy (default `http://localhost:8080`) and a Widevine challenge run in a webview to open chapters. Removed from the testing repo in `771b83f`. The folder `plugins/manga/kagane/` is still in the repo and could be deleted.
-
-### MangaBuddy (mangak.io): parked
-
-Native test plugin written from the endpoints used by Pal's MIT Seanime provider and karrot0's Mangak extension (no code copied). Search/popular (`api.mangak.io/titles/search`, popular = empty query: the first try with `q=` empty returned 400; the version without it works), series pages, chapter lists and titles all work in Harbor. Covers and chapter images do not load: both image hosts (`rx.resmk.org` for covers, `rx.qvzrg.org` for pages) answer a plain request with HTTP 403 and a 4 KB HTML page, and the wsrv.nl proxy gets a 404 (it cannot fetch them either). Likely a Referer rule, which Harbor cannot send. It is still listed in the testing repo and can be removed by dropping `mangabuddy-io` from `TESTING_PREFIXES` and `DEBUG_SKIP_PREFIXES` in `scripts/prune-repo.ts`.
-
-### Western comic sources: dead as Paperback conversions, native port unproven
-
-ReadAllComics, ReadComicsOnline and ZipComic (from `karrot0/KakarotExtension`) all fail on opening with `Application.executeInWebView is not a function`; Harbor's bridge has no webview call. The upstream ReadComicsOnline code shows why they need it: the site is behind a Cloudflare check, it even probes its image CDN (`cdn.readcomicsonline.ru`) and treats a 403 there as a Cloudflare challenge, and its search needs a cookie-bound CSRF token. A native port would hit the same walls unless these sites answer plain requests from inside Harbor. Probe3 (this commit) tests exactly that: the home page of each site plus the first cover image, from Harbor.
+- **BatCave** (Paperback extension from `karrot0/KakarotExtension`, `src/Batcave`, generated at build time, `EXTENDED` set in `scripts/prune-repo.ts`): `batcave.biz` returns HTTP 403 with a 5 KB page (default headers and browser User-Agent), probably a Cloudflare check. Harbor's check window opens and passes, but the plugin's own requests still fail. Not fixable from a plugin.
+- **Kagane**: needs a user-run Cloudflare-impersonating proxy (default `http://localhost:8080`) and a Widevine challenge in a webview. Not feasible. The folder `plugins/manga/kagane/` is still in the repo and could be deleted.
+- **MangaBuddy (mangak.io)**: native test plugin (`plugins/manga/mangabuddy-io/`, written from the endpoints used by Pal's MIT Seanime provider and karrot0's Mangak extension, no code copied). Search/popular (`api.mangak.io/titles/search`; the version with `q=` empty returns 400, the one without it works), series pages, chapter lists and titles work in Harbor. Covers and chapter images do not: the image hosts (`rx.resmk.org`, `rx.qvzrg.org`) answer a plain request with HTTP 403 and a 4 KB HTML page, and wsrv.nl gets a 404. Likely a Referer rule that Harbor cannot satisfy.
+- **Western comic sources** (ReadAllComics, ReadComicsOnline, ZipComic): the Paperback conversions all fail on opening with `Application.executeInWebView is not a function`. Native route: ReadComicsOnline and ZipComic made Harbor open its Cloudflare check window on a plain request (Probe3), so they are Cloudflare-protected. ReadAllComics: upstream is plain HTTP, a native test plugin (`plugins/manga/readall-native/`, 0.0.1 and 0.0.2, MIT notice kept) installed fine but returned nothing, then "source did not respond" / "err popular aborted"; the site does not load in the user's own browser either (down, or blocked by the ISP or network, not determined). Closed.
 
 ### Grid covers (Atsumaru, Mangapill)
 
-Atsumaru's `image` JPEG cover links are valid and `harbor.http` fetches them with 200, but the browse grid shows a gradient, and "View image" gave "image request failed 400" once. Mangapill showed the same. Probe 0.0.6 (ten header setups, all 200) is now known to be weak evidence (see rule 2). The Discord report was posted; no reply as of 24 Oct 16:13. Idea for a follow-up post: ask what headers the grid request sends, whether plugins can send Referer or Cookie at all, and whether Cloudflare clearance is shared with plugin requests. New cover angle (unchecked): Asura's cover host and whether Asura's covers draw in the grid.
+Atsumaru's `image` JPEG cover links are valid and `harbor.http` fetches them with 200, but the browse grid shows a gradient, and "View image" gave "image request failed 400" once. Mangapill showed the same. Probe 0.0.6 (ten header setups, all 200) is weak evidence (see rule 2). The Discord report was posted; no reply as of 24 Oct 16:13. Idea for a follow-up post: ask what headers the grid request sends, whether plugins can send Referer or Cookie at all, and whether Cloudflare clearance is shared with plugin requests. Unchecked angle: Asura's cover host and whether Asura's covers draw in the grid.
 
 ### Discord report (posted)
 
@@ -128,9 +117,8 @@ Asura Scans (pinned first), Atsumaru, Hijala, ManhwaNex, Thunderscans, MangaKata
 
 ## Next
 
-1. Read the Probe3 rows (testing repo, "Probe3 western sites"): for each of ReadComicsOnline, ReadAllComics, ZipComic, does the home page load without a Cloudflare page and does the first cover image answer a plain request? Only if both are fine, write a native port for that site (look at the selectors in `karrot0/KakarotExtension` `src/<Site>/main.ts`).
-2. Post a short correction and two questions in the Discord thread (what headers plugins can send; whether the cleared Cloudflare cookie reaches plugin requests). Wait for the developers' reply on the grid-cover rule.
-3. Spanish sources: read Mangas.in's source (find its repo from the Seanime index), run the image-host check first.
-4. Port candidates from Pal's repo that pass the image-host check: komiku, ravenscans, mangafreak, lelmanga, mangahub, mangaball (none read yet). Keep Pal's MIT notice.
-5. Cleanups: drop `mangabuddy-io` from the testing prefixes; delete `plugins/manga/kagane/`; remove the stale Probe/Probe2 entries by reinstalling; once the cover question is settled remove the "Atsumaru (cover debug)" copy and the cover-contact snippet; move the `globalThis` shim into the converter.
-6. Optional: test whether User-Agent, Origin and Accept reach the server through `harbor.http`; paginate Asura's browse page.
+1. Post a short correction and two questions in the Discord thread (what headers plugins can send; whether the cleared Cloudflare cookie reaches plugin requests). Wait for the developers' reply on the grid-cover rule.
+2. Spanish sources: read Mangas.in's source (find its repo from the Seanime index). Before writing anything: confirm the site loads in a browser and run the image-host check.
+3. Port candidates from Pal's repo that pass those checks: komiku, ravenscans, mangafreak, lelmanga, mangahub, mangaball (none read yet). Keep Pal's MIT notice.
+4. Cleanups still open: delete `plugins/manga/kagane/` (and the parked `mangabuddy-io` and `readall-native` folders if they are not wanted as reference); remove the stale Probe/Probe2/Probe3 entries from Harbor by reinstalling the testing repo; once the cover question is settled remove the "Atsumaru (cover debug)" copy and the cover-contact snippet; move the `globalThis` shim into the converter.
+5. Optional: test whether User-Agent, Origin and Accept reach the server through `harbor.http`; paginate Asura's browse page.
