@@ -1,6 +1,6 @@
 # Progress log
 
-## Handoff (24 Oct 2026, 11:35) - read this first
+## Handoff (24 Oct 2026, 16:30) - read this first
 
 Repo: `G1NYU/harbor-plugins`, branch `main`. Everything is deployed to GitHub Pages by `.github/workflows/deploy.yml` (typecheck, build, validate, update gate, deploy). Deploys take roughly 5-20 minutes. Harbor keeps stale copies, so after a push: remove the repo, reinstall the source, and check the version/name marker.
 
@@ -17,6 +17,7 @@ Repos on the pages site: `manga/repo.json` (main, 38 sources), `manga/repo-exten
 
 Latest commits, newest first:
 
+- `aff05f8` PROGRESS.md: Probe 0.0.6 results, deploy fix, final Discord report.
 - `a2067a9` CI: deploys are no longer cancelled by newer pushes; markdown-only pushes skip the deploy.
 - `01cf190` Handoff notes in PROGRESS.md.
 - `19a84ff` Probe 0.0.6: header-combination test for cover requests.
@@ -48,7 +49,7 @@ See the cover investigation below. Probe 0.0.6 result (read from the cards in Ha
 
 Reading: the Atsumaru cover loads with 200 under every header setup except an empty Referer (700, not a real HTTP code, probably a Harbor-side error; unexplained). So the header theory is not supported: if the grid card gets a 400, it comes from Harbor's own image request, not from headers a plugin can set. The Wikimedia URL returns 400 in every setup, including default, so it is a bad control (Wikimedia often rejects requests with a missing or generic User-Agent; not verified). The status was checked, not the response body.
 
-Waiting for a reply from Harbor's developers.
+The Discord report was posted; no reply from Harbor's developers as of 24 Oct 16:13. Parked for now.
 
 Working agreements: every push to the repo needs the user's confirmation first; cards in Harbor cut text after about 35 characters, so debug output is split into short rows that must be read in order.
 
@@ -76,6 +77,7 @@ Known issues, also listed on the pages site:
 - Harbor's "All Extensions" view mixes results from every installed source, so error cards from one source can sit next to real titles from another.
 - Plugins can only hand Harbor bare image links, so they cannot attach headers to images.
 - Harbor's share links look like `harbor://detail/manga/<plugin id>::<series id>`.
+- Harbor can also install Mangayomi extension repos (user report, see the Mangayomi section below).
 
 ### Cover investigation (Atsumaru, Mangapill)
 
@@ -92,7 +94,7 @@ What was found and tried:
 
 Conclusion so far: the plugin returns valid absolute JPEG links, `harbor.http` fetches them with 200 under every header setup tried, but Harbor's own image request for covers seems to be rejected (HTTP 400). So the grid card's request differs from what plugins can send. Mangapill shows the same symptom.
 
-### Discord report for Harbor's developers (final, ready to paste)
+### Discord report for Harbor's developers (posted)
 
 Title:
 
@@ -125,6 +127,23 @@ What does the grid / View image request send (User-Agent, Referer, Origin, Accep
 Harbor version: ___   OS: ___
 ```
 
+### Other ecosystems checked (24 Oct 2026, afternoon)
+
+Seanime (`5rahim/seanime`, GPL-3.0 app) and its community index `Bas1874/Seanime-Marketplace`:
+
+- Not installable in Harbor. Providers are small JS/TS classes with `search`, `findChapters` and `findChapterPages`; pages can carry per-page `headers`.
+- There is no popular/latest browse, only title search, so a port would only fill Harbor's search, chapters and pages.
+- The marketplace data in `/Marketplace` must not be copied or re-hosted (the README says developers who do are blacklisted). Do not copy it into this repo.
+- Possible use: a second reader to compare covers against. `Main.json` could not be read from here, so its source list is unknown.
+
+Mangayomi:
+
+- The original `kodjodevf/mangayomi-extensions` repo was archived on 3 Dec 2025. Its JS contributing guide describes `getPopular`, `search`, `getDetail`, `getPageList`, a `Client`, a `Document` parser and crypto helpers.
+- `tympanicblock61/mangayomi-extensions` is a fork. Per the user, its `index.json` works as a repo in Harbor, but only Weeb Central works. MangaDot worked once long ago and could not be reproduced, so it does not count.
+- JS sources in the fork (`javascript/manga/src`): `en/` comix, kagane, mangadot; `all/` bato, mangafire, weebcentral. Atsumaru, Mangapill, Asura Scans and Mangasushi are not JS sources there. The index also lists Dart "madara" entries (for example Mangasushi, Asura Scans.us) that were not tested.
+- Weeb Central is already known to be reachable from Harbor (front page returned 200 in the first Probe test).
+- Bato, MangaFire and Comix were not tested in Harbor (user reports they do not work) and their code was not read.
+
 ### Debug tooling (testing repo)
 
 Testing repo: `manga/repo-testing.json` on the pages site. Sources in it get a debug wrapper at build time:
@@ -140,13 +159,15 @@ Testing repo: `manga/repo-testing.json` on the pages site. Sources in it get a d
 
 ### Parked (still in testing, not published)
 
-- Kagane: loads now, but its first request returns 403 with a 6KB body (`GET /api/v2/genres/list`; earlier `POST /api/v2/sources/list`). Running the extension's own interceptors did not change this. The JSON genre list seen in a popup is most likely Harbor's Cloudflare window showing the response after a manual check. Still to test: solve the popup, then reopen Kagane and see whether Harbor keeps the clearance for plugin requests.
+- Kagane: decision, not feasible in Harbor. Its first request returns 403 with a 6KB body (`GET /api/v2/genres/list`; earlier `POST /api/v2/sources/list`) and the extension's own interceptors did not change this. The Mangayomi version (`kagane.js` in the fork, notes say "requires cloudflare proxy") sends every request through a user-run Cloudflare-impersonating proxy (default `http://localhost:8080`) and reads chapters through a Widevine EME challenge in a webview plus an integrity token (`/api/integrity`). Harbor's runtime has no webview or EME, so chapters could not open even if Cloudflare were solved. Remove Kagane from the testing repo when convenient. API facts, in case they are useful: host `yuzuki.kagane.to`, browse `POST /v2/search/series`, covers `/v2/image/<id>`.
 - Asura Scans: comes from Kodama's extension (REST API, account sign-in, tile descrambler). The browse page returns 200 with 230KB, then the parser fails reading `length` of something undefined (code positions around 143:10332). Shows only error cards when selected on its own; it once showed covers briefly in the "All" view. Interceptors did not change this.
 - Mangasushi: the upstream code throws "Unsupported Mangasushi metadata or image URL" on a page that downloaded fine (code positions around 138:19174). It relies on Paperback's own request checks and saved image authorizations, which Harbor's bridge does not provide. Probably not worth porting.
 
 ### Next
 
-1. Post the Discord report above (fill in Harbor version and OS) and wait for the grid-cover rule. If a plugin-side change is needed, apply it to Atsumaru (and possibly bring Mangapill back).
+1. Wait for Harbor's developers to answer the Discord report (grid-cover rule). If a plugin-side change is needed, apply it to Atsumaru (and possibly bring Mangapill back).
 2. Optional: Probe 0.0.7 with a better Wikimedia control; remove the stale 0.0.4 Probe copy from Harbor.
-3. Once the cover question is settled, remove the "Atsumaru (cover debug)" copy and the cover-contact snippet from `scripts/prune-repo.ts`, and remove the "No covers" item from the pages site if it is fixed.
-4. Move the `globalThis` shim into the converter (`shared/adapter/paperback-runtime.ts`).
+3. Remove Kagane from the testing repo (see Parked).
+4. Optional: read `weebcentral.js` in the Mangayomi fork to see how a source that works in Harbor is written, and compare its cover handling with Atsumaru.
+5. Once the cover question is settled, remove the "Atsumaru (cover debug)" copy and the cover-contact snippet from `scripts/prune-repo.ts`, and remove the "No covers" item from the pages site if it is fixed.
+6. Move the `globalThis` shim into the converter (`shared/adapter/paperback-runtime.ts`).
