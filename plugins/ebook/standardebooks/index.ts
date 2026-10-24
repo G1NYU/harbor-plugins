@@ -13,6 +13,10 @@ const HEADERS = {
 
 let currentBookUrl = '';
 
+function bookUrl(id: string) {
+  return `${BASE}/ebooks/${id}/`;
+}
+
 async function getDoc(path: string) {
   const url = path.startsWith('http') ? path : BASE + path;
   const res = await harbor.http(url, {
@@ -80,7 +84,7 @@ export const plugin: EBookProvider = {
   },
 
   async detail(id: string): Promise<EBookSummary | null> {
-    const url = `${BASE}/ebooks/${id}/`;
+    const url = bookUrl(id);
     const doc = await getDoc(url);
 
     currentBookUrl = url;
@@ -100,6 +104,7 @@ export const plugin: EBookProvider = {
 
   async chapters(id: string): Promise<EBookChapter[]> {
     try {
+      currentBookUrl = bookUrl(id);
       const textUrl = `${currentBookUrl}text/`;
       const doc = await getDoc(textUrl);
 
