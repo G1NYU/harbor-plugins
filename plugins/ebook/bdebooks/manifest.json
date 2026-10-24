@@ -1,7 +1,7 @@
 {
   "id": "bdebooks",
   "name": "BDeBooks",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "lang": "en",
   "nsfw": false,
   "entry": "bdebooks.plugin.js",

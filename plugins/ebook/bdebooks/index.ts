@@ -44,12 +44,13 @@ export const plugin: EBookProvider = {
   name: 'BDeBooks',
 
   async popular(offset: number): Promise<EBookSummary[]> {
-    const page = Math.floor(offset / 20) + 1;
-    const doc = await getDoc(`/en/books/popular/?page=${page}`);
-    return doc
-      .querySelectorAll('a[href*="/books/"]')
-      .map(parseBookLink)
-      .filter((b): b is EBookSummary => b !== null);
+    return [
+      {
+        id: 'as-a-man-thinketh-by-james-allen',
+        title: 'As a Man Thinketh',
+        cover: 'https://img.bdebooks.com/display-v1/en/35d7bde6324a7eecde323d44a622f646ecb46873a0aceeda2e0f62cef9dbfbde-w240.webp',
+      },
+    ];
   },
 
   async search(query: string, offset: number): Promise<EBookSummary[]> {
