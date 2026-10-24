@@ -48,7 +48,7 @@
       </div>
       <div class="repo-box" style="margin-top:1rem">
         <div class="repo-name">Manga Extended <span class="badge badge-warn">optional</span></div>
-        <p class="repo-desc">Everything in the Manga repo plus BatCave and Royal Road. These work, but may show a Cloudflare popup in Harbor. Use this one instead of the Manga repo, not alongside it.</p>
+        <p class="repo-desc">Everything in the Manga repo plus BatCave and Royal Road. These may show a Cloudflare popup in Harbor, and BatCave often still fails to load afterwards. Use this one instead of the Manga repo, not alongside it.</p>
         <div class="url-box">
           <code id="url-extended">Loading...</code>
           <button class="btn" onclick="copyUrl('url-extended', this)">COPY</button>
@@ -90,12 +90,11 @@
     </div>
     <div class="card-body">
       <ul class="steps-list" style="margin-top:0">
-        <li class="step-item"><span class="step-num">+</span><span><strong>New (24 Oct 2026):</strong> Atsumaru, Hijala, ManhwaNex, Thunderscans, MangaKatana, MangaDemon and VortexScans are now in the main Manga repo.</span></li>
-        <li class="step-item"><span class="step-num">!</span><span><strong>No covers:</strong> Atsumaru shows series without cover images. Series pages, chapters and reader pages load fine.</span></li>
+        <li class="step-item"><span class="step-num">+</span><span><strong>New (24 Oct 2026):</strong> &#9733; Asura Scans is now in the main Manga repo, pinned at the top. It took many attempts to get working in Harbor. Atsumaru, Hijala, ManhwaNex, Thunderscans, MangaKatana, MangaDemon and VortexScans were added the same day.</span></li>
+        <li class="step-item"><span class="step-num">!</span><span><strong>No covers:</strong> Atsumaru shows series without cover images. Series pages, chapters and reader pages load fine. This looks like a Harbor-side issue and has been reported to Harbor's developers.</span></li>
         <li class="step-item"><span class="step-num">!</span><span><strong>Mixed chapter sources:</strong> some of the sites VortexScans pulls from (for example NovelBuddy) can show &quot;this chapter could not be loaded from this source&quot;. MangaDemon lists chapters from several sites, and only some of them open.</span></li>
-        <li class="step-item"><span class="step-num">!</span><span><strong>Work, with caveats:</strong> BatCave, Royal Road, StoneScape, MangaK and LikeManga. Each one either triggers an annoying Cloudflare popup or doesn't show series images in Harbor, so they are left out of the main Manga repo.</span></li>
-        <li class="step-item"><span class="step-num">+</span><span><strong>Extended repo:</strong> BatCave and Royal Road are switched on in the Manga Extended repo above.</span></li>
-        <li class="step-item"><span class="step-num">&times;</span><span><strong>Not published yet:</strong> Kagane (blocked by Cloudflare), Asura Scans and Mangasushi do not work in Harbor yet.</span></li>
+        <li class="step-item"><span class="step-num">!</span><span><strong>Cloudflare sites:</strong> BatCave and Royal Road are in the Manga Extended repo. Sites behind a Cloudflare check open Harbor's check window, but the source can still fail to load afterwards, because Harbor does not pass the cleared cookie on to the plugin's own requests. BatCave is the clearest case.</span></li>
+        <li class="step-item"><span class="step-num">&times;</span><span><strong>Not published:</strong> Kagane (needs a Cloudflare proxy and a browser-only chapter check), Mangasushi, and MangaBuddy (its image host refuses requests without a site Referer, which Harbor cannot send).</span></li>
         <li class="step-item"><span class="step-num">&times;</span><span><strong>Removed:</strong> MangaFire, MangaTown and Mangapill. Mangapill worked, but its series covers did not show in Harbor.</span></li>
       </ul>
     </div>

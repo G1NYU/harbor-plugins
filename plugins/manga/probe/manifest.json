@@ -1,9 +1,9 @@
 {
-  "id": "probe2",
-  "name": "Probe2 0.0.7 (diagnostic)",
-  "version": "0.0.7",
+  "id": "probe3",
+  "name": "Probe3 western sites (diagnostic)",
+  "version": "0.0.1",
   "lang": "en",
   "nsfw": false,
-  "entry": "probe2.plugin.js",
-  "description": "Diagnostic: checks batcave.biz (check page, series page, chapter data) and whether harbor.http can send Cookie and Referer headers"
+  "entry": "probe3.plugin.js",
+  "description": "Diagnostic: loads the home pages of readcomicsonline.ru, readallcomics.com and zipcomic.com from inside Harbor and requests the first cover image of each, to see whether Cloudflare or the image host blocks plain requests"
 }
