@@ -1,0 +1,10 @@
+{
+  "id": "bdebooks",
+  "name": "BDeBooks",
+  "version": "0.1.0",
+  "lang": "en",
+  "nsfw": false,
+  "entry": "bdebooks.plugin.js",
+  "description": "Read eBooks from BDeBooks.",
+  "website": "https://bdebooks.com/"
+}
