@@ -1,1 +1,1 @@
-<actual full PROGRESS.md text, not a label>
+FULL_REAL_PROGRESS_MD_TEXT
