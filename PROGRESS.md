@@ -1,24 +1,27 @@
 # Progress log
 
-## Handoff (24 Oct 2026, 17:00) - read this first
+## Handoff (24 Oct 2026, 17:10) - read this first
 
 Repo: `G1NYU/harbor-plugins`, branch `main`. Everything is deployed to GitHub Pages by `.github/workflows/deploy.yml` (typecheck, build, validate, update gate, deploy). Deploys take roughly 5-20 minutes. Harbor keeps stale copies, so after a push: remove the repo, reinstall the source, and check the version/name marker.
 
 Deploy rules (since `a2067a9`): a running deploy is no longer cancelled by a newer push (`cancel-in-progress: false`; queued pushes wait, only the newest queued one runs), and pushes that only touch `*.md` files do not start a deploy.
+
+Key lesson (24 Oct 17:05): a native Harbor port of a simple HTML-scrape provider from Pal's MIT-licensed Seanime-Providers worked out of the box. The "Asura Scans (Seanime port)" test plugin (`asura-seanime` v0.0.1) loaded and worked perfectly in Harbor on the first try (user report; the individual checks, such as covers and the reader, were not itemized). The Paperback conversion of the same site (Kodama's extension) never got past its parser. So the cheapest way to add sources is to port small scrapers that read the site's HTML or JSON directly, instead of converting big Paperback bundles that need the `globalThis` shim, interceptors and debug wrappers. Harbor itself handled the plain `harbor.http` + regex approach without trouble.
 
 Key files:
 
 - `scripts/prune-repo.ts`: decides what is published. It holds `ORDER`, `KEEP` (main repo), `EXTENDED`, `TESTING` (testing repo), `DEBUG_SKIP`, `SHIM_PUBLISHED`, the `globalThis` shim, the Atsumaru cover fix, the debug wrapper, interceptor support, the cover-host contact snippet and the "Atsumaru (cover debug)" copy.
 - `public/index.html`: the pages site, including the Known issues card.
 - `plugins/manga/probe/`: the Probe diagnostic plugin (`manifest.json` + `index.ts`).
-- `plugins/manga/asura-seanime/`: native Harbor port of Pal's Seanime Asura Scans provider (testing only).
+- `plugins/manga/asura-seanime/`: native Harbor port of Pal's Seanime Asura Scans provider (testing repo, works).
 - `PROGRESS.md`: this file.
 
 Repos on the pages site: `manga/repo.json` (main, 38 sources), `manga/repo-extended.json` (main + BatCave + Royal Road), `manga/repo-testing.json` (Probe, Asura Scans (Seanime port), Mangasushi, Asura Scans (Kodama), Atsumaru (cover debug)).
 
 Latest commits, newest first:
 
-- (this commit) Asura Scans (Seanime port) test plugin; docs for the Seanime and Mangayomi findings.
+- (this commit) PROGRESS.md: Asura Scans (Seanime port) works; the lesson.
+- `b989053` Asura Scans (Seanime port) test plugin; docs for the Seanime and Mangayomi findings.
 - `771b83f` Kagane removed from the testing repo.
 - `7533fb6` PROGRESS.md: Seanime and Mangayomi research, Kagane decision.
 - `aff05f8` PROGRESS.md: Probe 0.0.6 results, deploy fix, final Discord report.
@@ -55,18 +58,15 @@ Reading: the Atsumaru cover loads with 200 under every header setup except an em
 
 The Discord report was posted; no reply from Harbor's developers as of 24 Oct 16:13. Parked for now.
 
+Possible new angle (not yet checked): note which host serves the Asura Scans covers and whether they draw in the grid. If they do, that is another working cover host to compare against `cdn.atsu.moe`, and it could be added to the Discord thread.
+
 Working agreements: every push to the repo needs the user's confirmation first; cards in Harbor cut text after about 35 characters, so debug output is split into short rows that must be read in order.
 
-### Open problem 3: Asura Scans (Seanime port), untested
+### Asura Scans (Seanime port): works (closed)
 
-The port is in the testing repo as "Asura Scans (Seanime port)" (`asura-seanime`, v0.0.1). It is a native plugin, so it has no `[dbg.i3]` marker; it shows errors as short rows itself (`ERR popular`, `NO PROPS`, `EMPTY popular`, `ERR chapters`). What to check in Harbor, in this order:
+The port is in the testing repo as "Asura Scans (Seanime port)" (`asura-seanime`, v0.0.1). User report on 24 Oct 17:05: it works perfectly out of the box. It is a native plugin, so it has no `[dbg.i3]` marker; it shows errors as short rows itself (`ERR popular`, `NO PROPS`, `EMPTY popular`, `ERR chapters`). It reads `asurascans.com/browse` (first page only), series pages from the `og:` tags and `/comics/<slug>/chapter/<n>` links, and reader pages from the `ChapterReader` props. Pal's version sends `Referer: https://asurascans.com` with each page image; Harbor cannot do that, and the reader worked anyway (to be confirmed if the reader was tested).
 
-1. Popular list: does it show series (it reads `asurascans.com/browse`, first page only)? If it shows `NO PROPS`, the site's Astro markup changed or `/browse` without a search term is not what the page uses.
-2. Covers: do they show in the grid? (Cover URLs come straight from the `cover` field of each series.)
-3. Series page: title, cover and description come from the page's `og:` tags. Chapter list: from `/comics/<slug>/chapter/<n>` links.
-4. Reader: page URLs come from the `ChapterReader` props. Pal's version sends `Referer: https://asurascans.com` with every page image. Harbor cannot attach headers to images, so the reader may fail if the image host checks the Referer.
-
-Not copied from Pal's version: nothing is cached; no pagination beyond the first page.
+Not copied from Pal's version: no caching; no pagination beyond the first page. Possible follow-ups: pagination for the browse page, a proper series description, moving the plugin from the testing repo to the main repo.
 
 ## 24 Oct 2026 - details
 
@@ -88,7 +88,7 @@ Known issues, also listed on the pages site:
 - Harbor's plugin runtime has no usable `globalThis`, `self`, `window` or `document`. They exist as names but hold nothing.
 - Many Paperback 0.9 bundles run `globalThis.App = ...` while loading. In Harbor that threw "Cannot set properties of undefined (setting 'App')", so the plugin never registered and Harbor only showed "the source did not respond". The CI checks run in Node, which has `globalThis`, so they could not catch it.
 - Fix: `scripts/prune-repo.ts` runs the upstream bundle as a function bound to its own global-like object (`EXEC_REPLACE` and `CALL_REPLACE`). It is applied to the published bundles that need it (`SHIM_PUBLISHED`: Thunderscans, MangaKatana, MangaDemon, VortexScans, Atsumaru). TODO: move this into `shared/adapter/paperback-runtime.ts` so every converted bundle gets it.
-- Pirate Vodka's native sources (Hijala, ManhwaNex) never touch `globalThis`, which is why they worked from the start.
+- Pirate Vodka's native sources (Hijala, ManhwaNex) never touch `globalThis`, which is why they worked from the start. The same holds for the native Asura Scans (Seanime port).
 - Harbor's "All Extensions" view mixes results from every installed source, so error cards from one source can sit next to real titles from another.
 - Plugins can only hand Harbor bare image links, so they cannot attach headers to images.
 - Harbor's share links look like `harbor://detail/manga/<plugin id>::<series id>`.
@@ -150,7 +150,7 @@ Seanime (`5rahim/seanime`, GPL-3.0 app) and its community index `Bas1874/Seanime
 - The marketplace index (`/Marketplace/*.json`) is not copied or re-hosted in this repo. Its README says the data comes from an authorized Discord bot and may only be read from the raw GitHub link. `Main.json` is 306 KB; only its first entries (alphabetical, up to "A") were readable from here.
 - Individual extension code is a separate matter: each belongs to its author and needs a licence check before porting.
 - `Seanime-contributions/Seanime-Providers` (Pal; moved from `Pal-droid/Seanime-Providers`) is MIT licensed (Copyright (c) 2025 Pal). Keep the MIT notice in ported code. Its `src/manga/` folder has: MangaWorldAdult, animesama, asurascans, atsumaru, fanfox, komiku, kuramanga, lelmanga, mangaball, mangabuddy, mangadot, mangafire, mangafreak, mangahub, mangakatana, manganato, mynimekumanga, ravenscans, taiyo, xcomic. Also `src/anime`, `src/other`, `src/plugins`. Only asurascans and atsumaru were read.
-- Pal's asurascans provider is a plain HTML scrape of the site's Astro island props (`BrowseFilters`, `ChapterReader`), about 5 KB, no API, no sign-in, no descrambler. This is what the "Asura Scans (Seanime port)" test plugin is based on.
+- Pal's asurascans provider is a plain HTML scrape of the site's Astro island props (`BrowseFilters`, `ChapterReader`), about 5 KB, no API, no sign-in, no descrambler. The "Asura Scans (Seanime port)" plugin is based on it and works.
 - Pal's atsumaru provider uses a Typesense search endpoint, `/api/manga/allChapters`, `/api/read/chapter`, and `posterMedium` (else `poster`) as the cover, with a Referer on each page. It does not explain the Harbor cover problem.
 - Other Seanime providers seen in search fragments (not read): Mangapill and WeebCentral (Island), AsuraScans (Pal, JS, v1.1.2), nhentai (nnotwen), baozimh (Elisoar111), Mangas.in (branrgx, Spanish).
 - Anime torrent, online-stream providers and UI plugins in the index depend on Seanime's own interface and are not useful for a manga reader. No ebook type was seen.
@@ -184,15 +184,16 @@ Testing repo: `manga/repo-testing.json` on the pages site. Sources in it get a d
 ### Parked (still in testing, not published)
 
 - Kagane: removed from the testing repo in `771b83f` (not feasible in Harbor). Its first request returned 403 with a 6KB body (`GET /api/v2/genres/list`; earlier `POST /api/v2/sources/list`) and the extension's own interceptors did not change this. The Mangayomi version (`kagane.js` in the fork, notes say "requires cloudflare proxy") sends every request through a user-run Cloudflare-impersonating proxy (default `http://localhost:8080`) and reads chapters through a Widevine EME challenge in a webview plus an integrity token (`/api/integrity`). Harbor's runtime has no webview or EME, so chapters could not open even if Cloudflare were solved. The plugin source folder `plugins/manga/kagane/` is still in the repo. API facts, in case they are useful: host `yuzuki.kagane.to`, browse `POST /v2/search/series`, covers `/v2/image/<id>`.
-- Asura Scans (Kodama): comes from Kodama's extension (REST API, account sign-in, tile descrambler). The browse page returns 200 with 230KB, then the parser fails reading `length` of something undefined (code positions around 143:10332). Shows only error cards when selected on its own; it once showed covers briefly in the "All" view. Interceptors did not change this. May be replaced by the Seanime port if that works.
+- Asura Scans (Kodama): superseded by the Seanime port. It comes from Kodama's extension (REST API, account sign-in, tile descrambler). The browse page returned 200 with 230KB, then the parser failed reading `length` of something undefined (code positions around 143:10332). Only showed error cards on its own; it once showed covers briefly in the "All" view. Interceptors did not change this. Candidate for removal from `TESTING`.
 - Mangasushi: the upstream code throws "Unsupported Mangasushi metadata or image URL" on a page that downloaded fine (code positions around 138:19174). It relies on Paperback's own request checks and saved image authorizations, which Harbor's bridge does not provide. Probably not worth porting.
 
 ### Next
 
-1. Wait for the deploy of this commit to go green, then remove and re-add the testing repo in Harbor and run the Asura Scans (Seanime port) checks in open problem 3.
-2. Wait for Harbor's developers to answer the Discord report (grid-cover rule). If a plugin-side change is needed, apply it to Atsumaru (and possibly bring Mangapill back).
-3. If the Asura port works, decide whether to replace the Kodama Asura entry. Other candidates from Pal's repo: mangafire, manganato, mangabuddy (not read).
-4. Optional: Probe 0.0.7 with a better Wikimedia control; remove the stale 0.0.4 Probe copy from Harbor; delete the unused `plugins/manga/kagane/` folder.
-5. Optional: read `weebcentral.js` in the Mangayomi fork to see how a source that works in Harbor is written, and compare its cover handling with Atsumaru.
-6. Once the cover question is settled, remove the "Atsumaru (cover debug)" copy and the cover-contact snippet from `scripts/prune-repo.ts`, and remove the "No covers" item from the pages site if it is fixed.
-7. Move the `globalThis` shim into the converter (`shared/adapter/paperback-runtime.ts`).
+1. Decide whether to move "Asura Scans (Seanime port)" into the main repo (`KEEP` and `ORDER` in `scripts/prune-repo.ts`) and remove the Kodama Asura entry (`asurascans`) from `TESTING`. Check the grid covers and the reader on a couple of series first.
+2. Port more small scrapers from Pal's MIT repo (`Seanime-contributions/Seanime-Providers`, `src/manga/`): candidates mangafire, manganato, mangabuddy, komiku, ravenscans, mangafreak (none read yet). Check each source's licence and keep Pal's MIT notice. Also consider a Seanime-style port for Mangapill and Mangasushi, which failed as Paperback conversions.
+3. Check which host serves the Asura Scans covers and whether they draw in the grid; if yes, add it to the Discord thread as a working comparison.
+4. Wait for Harbor's developers to answer the Discord report (grid-cover rule). If a plugin-side change is needed, apply it to Atsumaru (and possibly bring Mangapill back).
+5. Optional: Probe 0.0.7 with a better Wikimedia control; remove the stale 0.0.4 Probe copy from Harbor; delete the unused `plugins/manga/kagane/` folder.
+6. Optional: read `weebcentral.js` in the Mangayomi fork to see how a source that works in Harbor is written, and compare its cover handling with Atsumaru.
+7. Once the cover question is settled, remove the "Atsumaru (cover debug)" copy and the cover-contact snippet from `scripts/prune-repo.ts`, and remove the "No covers" item from the pages site if it is fixed.
+8. Move the `globalThis` shim into the converter (`shared/adapter/paperback-runtime.ts`).
