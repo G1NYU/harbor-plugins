@@ -1,6 +1,7 @@
 import type { EBookChapter, EBookProvider, EBookSummary } from '../../../shared/types/ebook.js';
 import { createUrlResolver } from '../../../shared/utils/url.js';
 import { cleanTitle } from '../../../shared/utils/text.js';
+import { extractProse } from '../../../shared/utils/prose.js';
 
 const BASE = 'https://standardebooks.org';
 const resolveUrl = createUrlResolver(BASE);
@@ -54,10 +55,9 @@ export const plugin: EBookProvider = {
   async search(query: string, offset: number): Promise<EBookSummary[]> {
     try {
       const doc = await getDoc(`/ebooks?query=${encodeURIComponent(query)}`);
-      const results = doc
-        .querySelectorAll('a[href*="/ebooks/"]')
+      const results = (doc.querySelectorAll('a[href*="/ebooks/"]') as any[])
         .map(parseBookLink)
-        .filter((b: EBookSummary | null): b is EBookSummary => b !== null);
+        .filter((b: EBookSummary | null) => b !== null) as EBookSummary[];
 
       if (results.length === 0) {
         return [
@@ -107,7 +107,7 @@ export const plugin: EBookProvider = {
       const chapters: EBookChapter[] = [];
       const seen = new Set<string>();
 
-      for (const a of links) {
+      for (const a of links as any[]) {
         const href = a.attr('href') || '';
         const chapterId = href.slice(1);
         if (!chapterId || seen.has(chapterId)) continue;
@@ -148,17 +148,23 @@ export const plugin: EBookProvider = {
     const textUrl = `${currentBookUrl}text/`;
     const doc = await getDoc(textUrl);
 
-    const start = doc.querySelector(`#${chapterId}`);
-    if (!start) return '';
+    const start = doc.querySelector(`#${chapterId}`) as any;
+    if (!start || !start.nextElementSibling) {
+      return extractProse(doc, 'body', 'p');
+    }
 
     const parts: string[] = [];
-    let el = start.nextElementSibling;
+    let el = start.nextElementSibling as any;
 
     while (el) {
-      if (el.attr('id')) break;
-      const text = el.text().trim();
+      if (el.attr && el.attr('id')) break;
+      const text = el.text ? el.text().trim() : '';
       if (text) parts.push(text);
       el = el.nextElementSibling;
+    }
+
+    if (parts.length === 0) {
+      return extractProse(doc, 'body', 'p');
     }
 
     return parts.join('\n\n');
