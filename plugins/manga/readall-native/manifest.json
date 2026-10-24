@@ -1,0 +1,10 @@
+{
+  "id": "readall-native1",
+  "name": "ReadAllComics (native) 0.0.1",
+  "version": "0.0.1",
+  "lang": "en",
+  "nsfw": false,
+  "entry": "readall-native1.plugin.js",
+  "description": "Test plugin for readallcomics.com (western comics). Plain HTML pages, first page of the catalogue only. Search for 'diag' to test the image hosts.",
+  "website": "https://readallcomics.com"
+}

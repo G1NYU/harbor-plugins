@@ -96,18 +96,15 @@ const EXTENDED = new Set<string>(['batcave', 'royalroad']);
 // Untested sources: shown in repo-testing.json (add ids here to try new ones)
 const TESTING = new Set<string>([
   'mangasushi',
-  'readallcomics',
-  'readcomicsonline',
-  'zipcomic',
 ]);
 
-// Testing ids that are matched by prefix, so a renamed diagnostic (probe3, mangabuddy-io3, ...) needs no edit here.
+// Testing ids that are matched by prefix, so a renamed diagnostic (probe4, readall-native2, ...) needs no edit here.
 // Harbor sometimes keeps serving an old copy of a plugin under the same id; a new id gets a fresh file.
-const TESTING_PREFIXES = ['probe', 'mangabuddy-io'];
+const TESTING_PREFIXES = ['probe', 'readall-native'];
 
 // Testing sources that get no debug wrapper (native plugins show their own error rows)
 const DEBUG_SKIP = new Set<string>(['asura-seanime']);
-const DEBUG_SKIP_PREFIXES = ['probe', 'mangabuddy-io'];
+const DEBUG_SKIP_PREFIXES = ['probe', 'readall-native'];
 
 // Published sources whose bundles need the globalThis shim (they assign globalThis.App at load)
 const SHIM_PUBLISHED = new Set<string>(['thunderscans', 'mangakatana', 'mangademon', 'vortexscans', 'atsumaru']);
