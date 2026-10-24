@@ -1,10 +1,10 @@
 {
-  "id": "mangabuddy-io",
-  "name": "MangaBuddy (mangak.io)",
-  "version": "0.0.1",
+  "id": "mangabuddy-io2",
+  "name": "MangaBuddy (mangak.io) 0.0.2",
+  "version": "0.0.2",
   "lang": "en",
   "nsfw": false,
-  "entry": "mangabuddy-io.plugin.js",
+  "entry": "mangabuddy-io2.plugin.js",
   "description": "Test plugin for mangak.io (the MangaBuddy site): JSON search API, series and chapter pages read from the site's embedded page data. First page only.",
   "website": "https://mangak.io"
 }

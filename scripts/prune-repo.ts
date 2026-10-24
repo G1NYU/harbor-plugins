@@ -95,16 +95,19 @@ const EXTENDED = new Set<string>(['batcave', 'royalroad']);
 
 // Untested sources: shown in repo-testing.json (add ids here to try new ones)
 const TESTING = new Set<string>([
-  'probe2',
-  'mangabuddy-io',
   'mangasushi',
   'readallcomics',
   'readcomicsonline',
   'zipcomic',
 ]);
 
-// Testing sources that get no debug wrapper
-const DEBUG_SKIP = new Set<string>(['probe2', 'asura-seanime', 'mangabuddy-io']);
+// Testing ids that are matched by prefix, so a renamed diagnostic (probe3, mangabuddy-io3, ...) needs no edit here.
+// Harbor sometimes keeps serving an old copy of a plugin under the same id; a new id gets a fresh file.
+const TESTING_PREFIXES = ['probe', 'mangabuddy-io'];
+
+// Testing sources that get no debug wrapper (native plugins show their own error rows)
+const DEBUG_SKIP = new Set<string>(['asura-seanime']);
+const DEBUG_SKIP_PREFIXES = ['probe', 'mangabuddy-io'];
 
 // Published sources whose bundles need the globalThis shim (they assign globalThis.App at load)
 const SHIM_PUBLISHED = new Set<string>(['thunderscans', 'mangakatana', 'mangademon', 'vortexscans', 'atsumaru']);
@@ -322,6 +325,9 @@ const repo = JSON.parse(fs.readFileSync(repoPath, 'utf-8'));
 const all: any[] = repo.plugins ?? [];
 
 const idOf = (p: any) => String(p.id).toLowerCase();
+const startsWithAny = (id: string, prefixes: string[]) => prefixes.some((x) => id.startsWith(x));
+const inTesting = (p: any) => TESTING.has(idOf(p)) || startsWithAny(idOf(p), TESTING_PREFIXES);
+const skipsDebug = (p: any) => DEBUG_SKIP.has(idOf(p)) || startsWithAny(idOf(p), DEBUG_SKIP_PREFIXES);
 const rank = (p: any) => {
   const i = ORDER.indexOf(idOf(p));
   return i < 0 ? ORDER.length : i;
@@ -329,8 +335,8 @@ const rank = (p: any) => {
 
 const kept = all.filter((p) => KEEP.has(idOf(p))).sort((a, b) => rank(a) - rank(b));
 const extra = all.filter((p) => EXTENDED.has(idOf(p)));
-const testing = all.filter((p) => TESTING.has(idOf(p)));
-const removed = all.filter((p) => !KEEP.has(idOf(p)) && !EXTENDED.has(idOf(p)) && !TESTING.has(idOf(p)));
+const testing = all.filter((p) => inTesting(p));
+const removed = all.filter((p) => !KEEP.has(idOf(p)) && !EXTENDED.has(idOf(p)) && !inTesting(p));
 
 for (const id of [...KEEP, ...EXTENDED, ...TESTING]) {
   if (!all.some((p) => idOf(p) === id)) {
@@ -384,7 +390,7 @@ if (atsuPub && atsuPub.entry) {
 
 // Apply the globalThis shim, interceptor support, debug wrapper and load guard to testing-only bundles
 for (const p of testing) {
-  if (DEBUG_SKIP.has(idOf(p)) || !p.entry) continue;
+  if (skipsDebug(p) || !p.entry) continue;
   const f = path.join(DIST, p.entry);
   if (!fs.existsSync(f)) continue;
   let code = fs.readFileSync(f, 'utf-8');

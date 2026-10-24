@@ -20,7 +20,7 @@ const UA =
 let lastMsg = '';
 
 function errText(e: any): string {
-  return String((e && e.message) || e).slice(0, 160);
+  return String((e && e.message) || e).slice(0, 380);
 }
 
 function errRows(msg: string): MangaSummary[] {
@@ -32,21 +32,37 @@ function errRows(msg: string): MangaSummary[] {
   return out;
 }
 
-async function getText(url: string, json: boolean): Promise<string> {
+function shortUrl(url: string): string {
+  return url.replace(SITE, '').replace(API, 'api');
+}
+
+async function getText(url: string, json: boolean, xhr: boolean): Promise<string> {
   const headers: Record<string, string> = {
     'User-Agent': UA,
     Accept: json ? 'application/json' : 'text/html',
     Referer: SITE + '/',
   };
-  if (json) headers['X-Requested-With'] = 'XMLHttpRequest';
+  if (json && xhr) headers['X-Requested-With'] = 'XMLHttpRequest';
   const r: any = await harbor.http(url, { responseType: 'text', timeoutMs: 20000, headers } as any);
   const status = Number(r?.status ?? 0);
-  if (status !== 200) throw new Error('HTTP ' + status + ' ' + url.replace(SITE, '').replace(API, 'api'));
+  if (status !== 200) {
+    const snippet = String(r?.body ?? '').replace(/\s+/g, ' ').slice(0, 90);
+    throw new Error('HTTP ' + status + ' ' + shortUrl(url) + (snippet ? ' | ' + snippet : ''));
+  }
   return String(r?.body ?? '');
 }
 
+// Try with the XHR header first, then without it (the header is only a guess from another extension)
 async function getJson(url: string): Promise<any> {
-  return JSON.parse(await getText(url, true));
+  try {
+    return JSON.parse(await getText(url, true, true));
+  } catch (e1) {
+    try {
+      return JSON.parse(await getText(url, true, false));
+    } catch (e2) {
+      throw new Error(errText(e1) + ' || no XHR header: ' + errText(e2));
+    }
+  }
 }
 
 function absUrl(u: any): string | undefined {
@@ -67,29 +83,41 @@ function pageProps(html: string): any {
 }
 
 async function search(q: string, label: string): Promise<MangaSummary[]> {
-  try {
-    const j = await getJson(API + '/titles/search?q=' + encodeURIComponent(q) + '&page=1&limit=24');
-    const items: any[] = j?.data?.items ?? [];
-    if (!j?.success || !Array.isArray(items)) return errRows('BAD JSON ' + label + ': success=' + String(j?.success));
-    const out: MangaSummary[] = [];
-    for (const it of items) {
-      if (!it?.slug) continue;
-      out.push({
-        id: String(it.slug),
-        title: String(it.name || it.slug),
-        cover: absUrl(it.cover),
-        lastChapter: it.latest_chapters?.[0]?.name ? String(it.latest_chapters[0].name) : undefined,
-      });
+  const base = API + '/titles/search?';
+  const urls = q
+    ? [base + 'q=' + encodeURIComponent(q) + '&page=1&limit=24']
+    : [base + 'page=1&limit=24', base + 'q=&page=1&limit=24', base + 'q=a&page=1&limit=24'];
+  let errors = '';
+  for (const url of urls) {
+    try {
+      const j = await getJson(url);
+      const items: any[] = j?.data?.items ?? [];
+      if (!j?.success || !Array.isArray(items)) {
+        errors += ' ## BAD JSON success=' + String(j?.success);
+        continue;
+      }
+      const out: MangaSummary[] = [];
+      for (const it of items) {
+        if (!it?.slug) continue;
+        out.push({
+          id: String(it.slug),
+          title: String(it.name || it.slug),
+          cover: absUrl(it.cover),
+          lastChapter: it.latest_chapters?.[0]?.name ? String(it.latest_chapters[0].name) : undefined,
+        });
+      }
+      if (out.length > 0) return out;
+      if (label === 'search') return [];
+      errors += ' ## EMPTY reply for ' + shortUrl(url);
+    } catch (e) {
+      errors += ' ## ' + errText(e);
     }
-    if (out.length === 0) return label === 'search' ? [] : errRows('EMPTY ' + label + ' (0 series in API reply)');
-    return out;
-  } catch (e) {
-    return errRows('ERR ' + label + ': ' + errText(e));
   }
+  return errRows('ERR ' + label + ':' + errors.slice(0, 360));
 }
 
 async function seriesData(slug: string): Promise<any> {
-  const props = pageProps(await getText(SITE + '/' + slug, false));
+  const props = pageProps(await getText(SITE + '/' + slug, false, false));
   const manga = props?.initialManga;
   if (!manga) throw new Error('series data not found');
   return manga;
@@ -107,8 +135,8 @@ function debugChapter(id: string, msg: string): MangaChapter {
 }
 
 const plugin: MangaProvider = {
-  id: 'mangabuddy-io',
-  name: 'MangaBuddy (mangak.io)',
+  id: 'mangabuddy-io2',
+  name: 'MangaBuddy (mangak.io) 0.0.2',
 
   async popular(offset: number) {
     if (offset > 0) return [];
@@ -169,7 +197,7 @@ const plugin: MangaProvider = {
 
   async pageUrls(chapterId: string) {
     if (chapterId.indexOf('::debug') >= 0) return [];
-    const props = pageProps(await getText(SITE + '/' + chapterId, false));
+    const props = pageProps(await getText(SITE + '/' + chapterId, false, false));
     const images = props?.initialChapter?.images;
     if (!Array.isArray(images) || images.length === 0) throw new Error('no images in chapter data');
     const out: string[] = [];
