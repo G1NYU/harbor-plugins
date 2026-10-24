@@ -122,6 +122,39 @@ const EXEC_REPLACE = [
 const CALL_FIND = 'const __sourceModule = __executeUpstream(Application);';
 const CALL_REPLACE = 'const __sourceModule = __executeUpstream.call(Object.create(__realG), Application);';
 
+// Interceptor support (testing repo only): the bridge normally stores only the interceptor id and drops the functions.
+// Keep the request/response functions and run them around every Application.scheduleRequest call.
+const INTERCEPT_PATCH = [
+  '// --- interceptor support (testing repo only) ---',
+  'const __icpt = [];',
+  'Application.registerInterceptor = function (id, reqSel, respSel) {',
+  '  for (let i = __icpt.length - 1; i >= 0; i--) { if (__icpt[i].id === id) __icpt.splice(i, 1); }',
+  '  __icpt.push({ id: id, req: reqSel, res: respSel });',
+  '};',
+  'Application.unregisterInterceptor = function (id) {',
+  '  for (let i = __icpt.length - 1; i >= 0; i--) { if (__icpt[i].id === id) __icpt.splice(i, 1); }',
+  '};',
+  'const __baseSchedule = Application.scheduleRequest;',
+  'Application.scheduleRequest = async function (req) {',
+  '  let r = Object.assign({}, req);',
+  '  for (const ic of __icpt.slice()) {',
+  '    if (typeof ic.req === "function") { const out = await ic.req(r); if (out) r = out; }',
+  '  }',
+  '  if (r.cookies && typeof r.cookies === "object") {',
+  '    const pairs = Object.keys(r.cookies).map(function (k) { return k + "=" + r.cookies[k]; });',
+  '    if (pairs.length) r.headers = Object.assign({}, r.headers || {}, { cookie: pairs.join("; ") });',
+  '  }',
+  '  const result = await __baseSchedule.call(Application, r);',
+  '  const resp = Object.assign({ cookies: [] }, result[0]);',
+  '  let data = result[1];',
+  '  for (const ic of __icpt.slice()) {',
+  '    if (typeof ic.res === "function") { const out = await ic.res(r, resp, data); if (out) data = out; }',
+  '  }',
+  '  return [result[0], data];',
+  '};',
+  '',
+].join('\n');
+
 // Debug wrapper injected into testing-repo bundles: shows real errors as rows (cards cut text, so short rows)
 const DEBUG_SNIPPET = [
   '  // --- debug wrapper (testing repo only) ---',
@@ -272,7 +305,7 @@ for (const p of kept) {
   }
 }
 
-// Apply the globalThis shim, debug wrapper and load guard to testing-only bundles
+// Apply the globalThis shim, interceptor support, debug wrapper and load guard to testing-only bundles
 for (const p of testing) {
   if (DEBUG_SKIP.has(idOf(p)) || !p.entry) continue;
   const f = path.join(DIST, p.entry);
@@ -280,7 +313,7 @@ for (const p of testing) {
   let code = fs.readFileSync(f, 'utf-8');
   if (code.includes('debug wrapper (testing repo only)')) continue;
   if (code.includes(EXEC_FIND) && code.includes(CALL_FIND)) {
-    code = code.replace(EXEC_FIND, () => EXEC_REPLACE).replace(CALL_FIND, () => CALL_REPLACE);
+    code = code.replace(EXEC_FIND, () => INTERCEPT_PATCH + EXEC_REPLACE).replace(CALL_FIND, () => CALL_REPLACE);
   } else {
     console.warn(`  Warning: ${p.entry} has no executeUpstream marker; globalThis shim skipped`);
   }
@@ -294,7 +327,7 @@ for (const p of testing) {
   const injected = code.slice(0, lineStart) + DEBUG_SNIPPET + code.slice(lineStart);
   const guarded = 'try {\n' + injected + loadGuardTail(String(p.id), String(p.name));
   fs.writeFileSync(f, guarded, 'utf-8');
-  p.version = `${p.version}-dbg`;
+  p.version = `${p.version}-dbg.i1`;
   p.name = `${p.name} [dbg]`;
 }
 
