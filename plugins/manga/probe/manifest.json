@@ -1,9 +1,9 @@
 {
-  "id": "probe",
-  "name": "Probe 0.0.7 (diagnostic)",
+  "id": "probe2",
+  "name": "Probe2 0.0.7 (diagnostic)",
   "version": "0.0.7",
   "lang": "en",
   "nsfw": false,
-  "entry": "probe.plugin.js",
+  "entry": "probe2.plugin.js",
   "description": "Diagnostic: checks batcave.biz (check page, series page, chapter data) and whether harbor.http can send Cookie and Referer headers"
 }

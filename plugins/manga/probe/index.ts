@@ -120,8 +120,8 @@ async function rows(): Promise<MangaSummary[]> {
 }
 
 export const plugin: MangaProvider = {
-  id: 'probe',
-  name: 'Probe 0.0.7 (diagnostic)',
+  id: 'probe2',
+  name: 'Probe2 0.0.7 (diagnostic)',
   popular: () => rows(),
   search: () => rows(),
   async detail(id: string) {
