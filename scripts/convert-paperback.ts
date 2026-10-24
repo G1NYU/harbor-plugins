@@ -136,6 +136,7 @@ async function main() {
 
   const previous = loadPreviousManifests();
   const failures = new Map<string, string>();
+  const upstreamStatus: Array<{ name: string; ok: boolean; count?: number; error?: string }> = [];
 
   const upstreams: UpstreamRef[] = [
     {
@@ -150,10 +151,12 @@ async function main() {
   const seen = new Set<string>();
 
   for (const up of upstreams) {
+    const upName = up.name ?? up.versioningUrl;
     try {
       console.log(`Fetching upstream registry from: ${up.versioningUrl}`);
       const versioning = await fetchJson<UpstreamVersioning>(up.versioningUrl);
-      console.log(`Found ${versioning.sources.length} sources in ${up.name ?? up.versioningUrl}.`);
+      console.log(`Found ${versioning.sources.length} sources in ${upName}.`);
+      upstreamStatus.push({ name: upName, ok: true, count: versioning.sources.length });
       for (const s of versioning.sources) {
         const pid = toPluginId(s.id);
         if (seen.has(pid)) continue;
@@ -162,6 +165,7 @@ async function main() {
       }
     } catch (err: any) {
       console.warn(`  Warning: could not read upstream ${up.versioningUrl}: ${err.message}`);
+      upstreamStatus.push({ name: upName, ok: false, error: String(err.message).slice(0, 120) });
     }
   }
 
@@ -318,7 +322,11 @@ async function main() {
   const repoJsonPath = path.join(DIST_MANGA_DIR, 'repo.json');
   fs.writeFileSync(repoJsonPath, JSON.stringify(fullRepoManifest, null, 2), 'utf-8');
 
-  fs.writeFileSync(path.join(DIST_MANGA_DIR, 'sync-report.json'), JSON.stringify({ restored }, null, 2), 'utf-8');
+  fs.writeFileSync(
+    path.join(DIST_MANGA_DIR, 'sync-report.json'),
+    JSON.stringify({ restored, upstreams: upstreamStatus }, null, 2),
+    'utf-8'
+  );
 
   console.log('========================================');
   console.log('Upstream Sync and Conversion Complete');

@@ -1,0 +1,41 @@
+name: Trial Source Report
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/trial-report.trigger'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Plugins & Manifests
+        run: npm run build
+
+      - name: Test trial sources
+        run: npm run trial-report
+
+      - name: Post report as an issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --title "Trial source report $(date -u +'%Y-%m-%d %H:%M') UTC" --body-file trial-report.md

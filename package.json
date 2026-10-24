@@ -9,6 +9,7 @@
     "convert": "tsx scripts/convert-paperback.ts",
     "sync-upstream": "tsx scripts/build.ts && tsx scripts/convert-paperback.ts && tsx scripts/validate.ts",
     "gate": "tsx scripts/update-gate.ts",
+    "trial-report": "tsx scripts/trial-report.ts",
     "validate": "tsx scripts/validate.ts",
     "typecheck": "tsc --noEmit",
     "serve": "tsx scripts/serve.ts",
