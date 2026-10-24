@@ -1,16 +1,18 @@
 import type { MangaProvider, MangaSummary } from '@shared/types/manga.js';
 
-const UA =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
-
 const API =
   'https://atsu.moe/api/home2/mostBookmarked?offset=0&limit=5&mediums=Comic&types=Manga,Manwha,Manhua,OEL&contentRatings=Safe,Suggestive,Erotica&timeframe=weekly';
 const CDN = 'https://cdn.atsu.moe';
 
-async function get(url: string, headers?: Record<string, string>): Promise<any> {
-  const opts: any = { responseType: 'text', timeoutMs: 15000 };
-  if (headers) opts.headers = headers;
-  return harbor.http(url, opts);
+const FIELDS: Array<[string, string]> = [
+  ['img', 'image'],
+  ['sm', 'smallImage'],
+  ['med', 'mediumImage'],
+  ['lg', 'largeImage'],
+];
+
+async function get(url: string): Promise<any> {
+  return harbor.http(url, { responseType: 'text', timeoutMs: 15000 } as any);
 }
 
 function coverUrl(raw: any): string {
@@ -32,37 +34,33 @@ function errText(e: any): string {
 
 async function lines(): Promise<string[]> {
   const out: string[] = [];
-  let item: any = null;
+  let items: any[] = [];
   try {
     const r = await get(API);
     out.push('API: ' + brief(r));
     const j = JSON.parse(String(r?.body ?? '{}'));
-    const items = Array.isArray(j?.items) ? j.items : [];
+    items = Array.isArray(j?.items) ? j.items : [];
     out.push('items: ' + items.length);
-    item = items[0] ?? null;
   } catch (e: any) {
     out.push('API ERR ' + errText(e));
   }
-  if (!item) return out;
 
-  out.push('keys: ' + Object.keys(item).join(','));
-  const raw = item.mediumImage ?? item.smallImage ?? item.image;
-  out.push('raw: ' + JSON.stringify(raw === undefined ? null : raw).slice(0, 80));
-  const url = coverUrl(raw);
-  out.push('url: ' + url);
-  if (!url) return out;
-
-  const tests: Array<[string, Record<string, string> | undefined]> = [
-    ['default', undefined],
-    ['referer', { Referer: 'https://atsu.moe/' }],
-    ['ref+UA', { Referer: 'https://atsu.moe/', 'User-Agent': UA, Accept: 'image/avif,image/webp,image/*,*/*;q=0.8' }],
-  ];
-  for (const [label, h] of tests) {
-    try {
-      const r = await get(url, h);
-      out.push(label + ': ' + brief(r));
-    } catch (e: any) {
-      out.push(label + ' ERR ' + errText(e));
+  for (let n = 0; n < Math.min(items.length, 2); n++) {
+    const item = items[n];
+    out.push('--- series ' + (n + 1));
+    for (const [label, field] of FIELDS) {
+      const url = coverUrl(item[field]);
+      if (!url) {
+        out.push(label + ': none');
+        continue;
+      }
+      const ext = url.split('?')[0].split('.').pop() ?? '?';
+      try {
+        const r = await get(url);
+        out.push(label + ' .' + ext + ' ' + brief(r));
+      } catch (e: any) {
+        out.push(label + ' .' + ext + ' ERR ' + errText(e));
+      }
     }
   }
   return out;

@@ -1,9 +1,9 @@
 {
   "id": "probe",
   "name": "Probe (diagnostic)",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "lang": "en",
   "nsfw": false,
   "entry": "probe.plugin.js",
-  "description": "Diagnostic: requests an Atsumaru cover image from inside Harbor and shows the results"
+  "description": "Diagnostic: checks the file type of each Atsumaru image field from inside Harbor"
 }
