@@ -1,0 +1,10 @@
+{
+  "id": "asura-seanime",
+  "name": "Asura Scans (Seanime port)",
+  "version": "0.0.1",
+  "lang": "en",
+  "nsfw": false,
+  "entry": "asura-seanime.plugin.js",
+  "description": "Test port of Pal's Seanime provider for asurascans.com (reads the site's Astro island data). First page only.",
+  "website": "https://asurascans.com"
+}

@@ -94,12 +94,13 @@ const EXTENDED = new Set<string>(['batcave', 'royalroad']);
 // Untested sources: shown in repo-testing.json (add ids here to try new ones)
 const TESTING = new Set<string>([
   'probe',
+  'asura-seanime',
   'mangasushi',
   'asurascans',
 ]);
 
 // Testing sources that get no debug wrapper
-const DEBUG_SKIP = new Set<string>(['probe']);
+const DEBUG_SKIP = new Set<string>(['probe', 'asura-seanime']);
 
 // Published sources whose bundles need the globalThis shim (they assign globalThis.App at load)
 const SHIM_PUBLISHED = new Set<string>(['thunderscans', 'mangakatana', 'mangademon', 'vortexscans', 'atsumaru']);
