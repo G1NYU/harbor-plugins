@@ -4,6 +4,7 @@ import path from 'node:path';
 const ROOT = process.cwd();
 const DIST = path.join(ROOT, 'dist', 'manga');
 const STEP_TIMEOUT_MS = 20000;
+const CONTROLS = ['weebcentral', 'mangapill', 'mangadex'];
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
 
@@ -129,13 +130,15 @@ async function runPlugin(code: string): Promise<Outcome> {
   steps.load = 'ok';
 
   const attempt = async (name: string, fn: () => Promise<any>): Promise<any> => {
+    const t0 = Date.now();
+    const secs = () => ' ' + ((Date.now() - t0) / 1000).toFixed(1) + 's';
     try {
       const v = await withTimeout(fn(), STEP_TIMEOUT_MS);
-      if (Array.isArray(v)) steps[name] = v.length > 0 ? 'ok (' + v.length + ')' : 'empty';
-      else steps[name] = v ? 'ok' : 'empty';
+      if (Array.isArray(v)) steps[name] = (v.length > 0 ? 'ok (' + v.length + ')' : 'empty') + secs();
+      else steps[name] = (v ? 'ok' : 'empty') + secs();
       return v;
     } catch (e: any) {
-      steps[name] = 'error: ' + String(e?.message ?? e).slice(0, 80);
+      steps[name] = 'error: ' + String(e?.message ?? e).slice(0, 80) + secs();
       return undefined;
     }
   };
@@ -177,10 +180,16 @@ function readTestingIds(): string[] {
 
 async function main() {
   const testingPath = path.join(DIST, 'repo-testing.json');
+  const mainPath = path.join(DIST, 'repo.json');
   const reportPath = path.join(DIST, 'sync-report.json');
   let plugins: any[] = [];
   if (fs.existsSync(testingPath)) {
     plugins = JSON.parse(fs.readFileSync(testingPath, 'utf-8')).plugins ?? [];
+  }
+  let controls: any[] = [];
+  if (fs.existsSync(mainPath)) {
+    const all: any[] = JSON.parse(fs.readFileSync(mainPath, 'utf-8')).plugins ?? [];
+    controls = all.filter((p) => CONTROLS.includes(String(p.id).toLowerCase()));
   }
   let upstreams: any[] = [];
   if (fs.existsSync(reportPath)) {
@@ -193,21 +202,26 @@ async function main() {
   const present = new Set(plugins.map((p) => String(p.id).toLowerCase()));
   const missing = wanted.filter((id) => !present.has(id));
 
+  const targets = [
+    ...plugins.map((p) => ({ p, label: String(p.id) })),
+    ...controls.map((p) => ({ p, label: 'control: ' + String(p.id) })),
+  ];
+
   const rows: string[] = [];
-  for (const p of plugins) {
-    const file = path.join(DIST, p.entry);
+  for (const t of targets) {
+    const file = path.join(DIST, t.p.entry);
     if (!fs.existsSync(file)) {
-      rows.push('| ' + p.id + ' | bundle file missing | | | | | | |');
+      rows.push('| ' + t.label + ' | bundle file missing | | | | | | |');
       continue;
     }
-    console.log('Testing ' + p.id + '...');
+    console.log('Testing ' + t.label + '...');
     const r = await runPlugin(fs.readFileSync(file, 'utf-8'));
     const cell = (k: string) => (r.steps[k] ?? '-').replace(/\|/g, '/');
     rows.push(
       '| ' +
-        p.id +
+        t.label +
         ' v' +
-        (p.version ?? '?') +
+        (t.p.version ?? '?') +
         ' | ' +
         ['load', 'popular', 'search', 'detail', 'chapters', 'pages'].map(cell).join(' | ') +
         ' | ' +
@@ -223,7 +237,7 @@ async function main() {
   const md = [
     '# Trial source report',
     '',
-    'Run from GitHub Actions (not from your PC), using a stand-in for Harbor. Errors here show what the plugin sees from GitHub\'s servers.',
+    'Run from GitHub Actions (not from your PC), using a stand-in for Harbor. Errors here show what the plugin sees from GitHub\'s servers. Times are per step. Rows marked control are sources already in the main list.',
     '',
     '## Upstreams',
     '',
