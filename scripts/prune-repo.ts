@@ -94,6 +94,83 @@ const TESTING = new Set<string>([
   'asurascans',
 ]);
 
+// Testing sources that already work: no debug wrapper
+const DEBUG_SKIP = new Set<string>(['probe', 'hijala', 'manhwanex']);
+
+// Debug wrapper injected into testing-repo bundles: shows real errors as rows (cards cut text, so short rows)
+const DEBUG_SNIPPET = [
+  '  // --- debug wrapper (testing repo only) ---',
+  '  (function () {',
+  '    var lastReq = "";',
+  '    var lastMsg = "";',
+  '    function errText(e) { var m = (e && e.message) ? e.message : String(e); return String(m).slice(0, 200); }',
+  '    try {',
+  '      var oh = harbor.http;',
+  '      harbor.http = async function (u, o) {',
+  '        var m = (o && o.method) || "GET";',
+  '        try {',
+  '          var r = await oh.call(harbor, u, o);',
+  '          lastReq = m + " " + String(u).slice(0, 80) + " -> " + r.status + " " + Math.round(String(r.body || "").length / 1024) + "KB";',
+  '          return r;',
+  '        } catch (e) {',
+  '          lastReq = m + " " + String(u).slice(0, 80) + " -> THROW " + errText(e);',
+  '          throw e;',
+  '        }',
+  '      };',
+  '    } catch (_) {}',
+  '    function full(msg) { return msg + (lastReq ? " | last request: " + lastReq : " | no web request made"); }',
+  '    function rows(msg) {',
+  '      lastMsg = full(msg);',
+  '      var out = [];',
+  '      for (var i = 0; i < lastMsg.length && out.length < 10; i += 34) {',
+  '        out.push({ id: "debug-" + out.length, title: lastMsg.slice(i, i + 34) });',
+  '      }',
+  '      return out;',
+  '    }',
+  '    ["popular", "search"].forEach(function (name) {',
+  '      var orig = plugin[name];',
+  '      plugin[name] = async function () {',
+  '        var args = arguments;',
+  '        try {',
+  '          var r = await orig.apply(this, args);',
+  '          var emptyQuery = name === "popular" || !args[0];',
+  '          if ((!r || r.length === 0) && emptyQuery) return rows("EMPTY " + name + " (0 items parsed)");',
+  '          return r;',
+  '        } catch (e) {',
+  '          try { harbor.log("[debug] " + name + " failed:", e); } catch (_) {}',
+  '          return rows("ERR " + name + ": " + errText(e));',
+  '        }',
+  '      };',
+  '    });',
+  '    var od = plugin.detail;',
+  '    plugin.detail = async function (id) {',
+  '      if (String(id).indexOf("debug-") === 0) return { id: id, title: lastMsg.slice(0, 120), description: lastMsg };',
+  '      try {',
+  '        var r = await od.apply(this, arguments);',
+  '        if (!r) { lastMsg = full("EMPTY detail (null returned)"); return { id: id, title: lastMsg.slice(0, 120), description: lastMsg }; }',
+  '        return r;',
+  '      } catch (e) {',
+  '        lastMsg = full("ERR detail: " + errText(e));',
+  '        return { id: id, title: lastMsg.slice(0, 120), description: lastMsg };',
+  '      }',
+  '    };',
+  '    function dbgChapter(id, msg) {',
+  '      return { id: id + "::debug", chapter: null, title: full(msg), volume: null, pages: 0, language: "en" };',
+  '    }',
+  '    var oc = plugin.chapters;',
+  '    plugin.chapters = async function (id) {',
+  '      try {',
+  '        var r = await oc.apply(this, arguments);',
+  '        if (!r || r.length === 0) return [dbgChapter(id, "EMPTY chapters (0 parsed)")];',
+  '        return r;',
+  '      } catch (e) {',
+  '        return [dbgChapter(id, "ERR chapters: " + errText(e))];',
+  '      }',
+  '    };',
+  '  })();',
+  '',
+].join('\n');
+
 const repoPath = path.join(DIST, 'repo.json');
 const repo = JSON.parse(fs.readFileSync(repoPath, 'utf-8'));
 const all: any[] = repo.plugins ?? [];
@@ -119,6 +196,24 @@ for (const p of removed) {
   if (!p.entry) continue;
   const f = path.join(DIST, p.entry);
   if (fs.existsSync(f)) fs.rmSync(f);
+}
+
+// Inject the debug wrapper into testing-only bundles
+for (const p of testing) {
+  if (DEBUG_SKIP.has(idOf(p)) || !p.entry) continue;
+  const f = path.join(DIST, p.entry);
+  if (!fs.existsSync(f)) continue;
+  const code = fs.readFileSync(f, 'utf-8');
+  if (code.includes('debug wrapper (testing repo only)')) continue;
+  const marker = '// Register with Harbor';
+  const at = code.lastIndexOf(marker);
+  if (at < 0) {
+    console.warn(`  Warning: no registration marker in ${p.entry}; debug wrapper skipped`);
+    continue;
+  }
+  const lineStart = code.lastIndexOf('\n', at) + 1;
+  fs.writeFileSync(f, code.slice(0, lineStart) + DEBUG_SNIPPET + code.slice(lineStart), 'utf-8');
+  p.version = `${p.version}-dbg`;
 }
 
 if (testing.length > 0) {
