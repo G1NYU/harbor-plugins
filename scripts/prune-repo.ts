@@ -97,6 +97,9 @@ const EXTENDED = new Set<string>(['batcave', 'royalroad']);
 const TESTING = new Set<string>([
   'probe',
   'mangasushi',
+  'readallcomics',
+  'readcomicsonline',
+  'zipcomic',
 ]);
 
 // Testing sources that get no debug wrapper

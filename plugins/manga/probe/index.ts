@@ -1,67 +1,110 @@
 import type { MangaProvider, MangaSummary } from '@shared/types/manga.js';
 
-const API =
-  'https://atsu.moe/api/home2/mostBookmarked?offset=0&limit=5&mediums=Comic&types=Manga,Manwha,Manhua,OEL&contentRatings=Safe,Suggestive,Erotica&timeframe=weekly';
-const CDN = 'https://cdn.atsu.moe';
-const WIKI = 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Fronalpstock_big.jpg/320px-Fronalpstock_big.jpg';
+const BASE = 'https://batcave.biz';
+const ECHO = 'https://httpbin.org/headers';
+const BROWSER_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36';
 
-const VARIANTS: Array<[string, Record<string, string>]> = [
-  ['default', {}],
-  ['ref http', { Referer: 'http://tauri.localhost/' }],
-  ['ref https', { Referer: 'https://tauri.localhost/' }],
-  ['ref+origin', { Referer: 'http://tauri.localhost/', Origin: 'http://tauri.localhost' }],
-  ['empty UA', { 'User-Agent': '' }],
-  ['reqwest UA', { 'User-Agent': 'reqwest/0.12.5' }],
-  ['accept img', { Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8' }],
-  ['accept all', { Accept: '*/*' }],
-  ['empty ref', { Referer: '' }],
-  ['site ref', { Referer: 'https://atsu.moe/' }],
-];
-
-async function getJson(url: string): Promise<any> {
-  const r: any = await harbor.http(url, { responseType: 'text', timeoutMs: 15000 } as any);
-  return JSON.parse(String(r?.body ?? '{}'));
+interface Res {
+  status: string;
+  body: string;
+  err?: string;
 }
 
-async function code(url: string, headers: Record<string, string>): Promise<string> {
+async function call(url: string, opts: Record<string, any>): Promise<Res> {
   try {
-    const r: any = await harbor.http(url, { responseType: 'text', timeoutMs: 15000, headers } as any);
-    return String(r?.status ?? '?');
-  } catch (_) {
-    return 'ERR';
+    const r: any = await harbor.http(url, { responseType: 'text', timeoutMs: 20000, ...opts } as any);
+    return { status: String(r?.status ?? '?'), body: String(r?.body ?? '') };
+  } catch (e: any) {
+    return { status: 'ERR', body: '', err: String((e && e.message) || e).slice(0, 60) };
   }
 }
 
-function atsuCover(raw: any): string {
-  const t = typeof raw === 'string' ? raw : raw?.posterMedium ?? raw?.posterSmall ?? raw?.poster;
-  if (!t || typeof t !== 'string') return '';
-  if (t.startsWith('http')) return t;
-  return CDN + (t.startsWith('/') ? t : '/static/' + t);
+function hasPow(b: string): boolean {
+  return (
+    /\.open\(\s*["']POST["']\s*,\s*["']\/_v["']/.test(b) || (b.includes('pow_nonce') && b.includes('pow_hash'))
+  );
+}
+
+function show(label: string, r: Res, extra: string): string {
+  if (r.status === 'ERR') return label + ': ERR ' + (r.err || '');
+  const kb = Math.round(r.body.length / 1024);
+  return label + ': ' + r.status + ' ' + kb + 'KB pow:' + (hasPow(r.body) ? 'Y' : 'N') + (extra ? ' ' + extra : '');
+}
+
+function listFlag(b: string): string {
+  return 'list:' + (b.includes('poster__title') || b.includes('readed') ? 'Y' : 'N');
+}
+
+function sent(r: Res, needle: string): string {
+  if (r.status === 'ERR') return 'ERR ' + (r.err || '');
+  return r.status + ' sent:' + (r.body.includes(needle) ? 'Y' : 'N');
 }
 
 async function lines(): Promise<string[]> {
-  const out: string[] = ['A=atsumaru cover W=wikimedia image'];
-  let atsu = '';
-  try {
-    const j = await getJson(API);
-    const it = Array.isArray(j?.items) ? j.items[0] : null;
-    atsu = atsuCover(it?.image);
-  } catch (_) {}
-  if (!atsu) {
-    out.push('Atsumaru API failed');
-    return out;
+  const out: string[] = ['pow:Y = bot check page'];
+
+  const home = await call(BASE + '/', {});
+  out.push(show('home default', home, listFlag(home.body)));
+  const homeUa = await call(BASE + '/', { headers: { 'User-Agent': BROWSER_UA } });
+  out.push(show('home browser UA', homeUa, listFlag(homeUa.body)));
+
+  const good = !hasPow(homeUa.body) && homeUa.body ? homeUa.body : !hasPow(home.body) ? home.body : '';
+  const powBody = hasPow(home.body) ? home.body : hasPow(homeUa.body) ? homeUa.body : '';
+  if (powBody) {
+    const i = Math.max(powBody.indexOf('pow_nonce'), powBody.indexOf('/_v'));
+    const from = Math.max(0, i - 100);
+    out.push('POW> ' + powBody.slice(from, from + 330).replace(/\s+/g, ' '));
   }
-  for (const [label, headers] of VARIANTS) {
-    const [a, w] = await Promise.all([code(atsu, headers), code(WIKI, headers)]);
-    out.push(label + ': A' + a + ' W' + w);
+
+  const link = /href="((?:https:\/\/batcave\.biz)?\/(\d+)-[^"]+\.html)"/.exec(good);
+  if (!link) {
+    out.push('no series link found');
+  } else {
+    const url = link[1].startsWith('http') ? link[1] : BASE + link[1];
+    const page = await call(url, { headers: { 'User-Agent': BROWSER_UA } });
+    out.push(show('series', page, 'data:' + (page.body.includes('__DATA__') ? 'Y' : 'N')));
+    const m = /window\.__DATA__\s*=\s*({[\s\S]*?});/.exec(page.body);
+    let chapId = '';
+    try {
+      if (m) chapId = String(JSON.parse(m[1]).chapters[0].id);
+    } catch (_) {}
+    if (chapId) {
+      const ajax = await call(BASE + '/engine/ajax/controller.php?mod=api&action=reader/getChapterData', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded', 'User-Agent': BROWSER_UA },
+        body: 'news_id=' + link[2] + '&chapter_id=' + chapId,
+      });
+      let imgs = '?';
+      try {
+        const j = JSON.parse(ajax.body);
+        imgs = String((j?.data?.images || []).length);
+      } catch (_) {}
+      out.push(show('chapter data', ajax, 'images:' + imgs));
+    } else {
+      out.push('no chapter id found');
+    }
   }
+
+  const ck0 = await call(ECHO, { headers: { Cookie: 'probe=1' } });
+  out.push('cookie plain: ' + sent(ck0, 'probe=1'));
+  const ck1 = await call(ECHO, { headers: { Cookie: 'probe=1' }, allowCookie: 'probe=1' });
+  out.push('cookie allow=value: ' + sent(ck1, 'probe=1'));
+  const ck2 = await call(ECHO, { headers: { Cookie: 'probe=1' }, allowCookie: 'httpbin.org' });
+  out.push('cookie allow=host: ' + sent(ck2, 'probe=1'));
+  const rf0 = await call(ECHO, { headers: { Referer: 'https://example.org/probe' } });
+  out.push('referer plain: ' + sent(rf0, 'example.org/probe'));
+  const rf1 = await call(ECHO, { headers: { Referer: 'https://example.org/probe' }, allowReferer: 'https://example.org/probe' });
+  out.push('referer allow=value: ' + sent(rf1, 'example.org/probe'));
+  const rf2 = await call(ECHO, { headers: { Referer: 'https://example.org/probe' }, allowReferer: 'httpbin.org' });
+  out.push('referer allow=host: ' + sent(rf2, 'example.org/probe'));
   return out;
 }
 
 function toRows(ls: string[]): MangaSummary[] {
   const out: MangaSummary[] = [];
   for (const l of ls) {
-    for (let i = 0; i < l.length && out.length < 40; i += 34) {
+    for (let i = 0; i < l.length && out.length < 60; i += 34) {
       out.push({ id: 'r' + out.length, title: l.slice(i, i + 34) } as MangaSummary);
     }
   }
@@ -69,12 +112,16 @@ function toRows(ls: string[]): MangaSummary[] {
 }
 
 async function rows(): Promise<MangaSummary[]> {
-  return toRows(await lines());
+  try {
+    return toRows(await lines());
+  } catch (e: any) {
+    return toRows(['PROBE ERR: ' + String((e && e.message) || e)]);
+  }
 }
 
 export const plugin: MangaProvider = {
   id: 'probe',
-  name: 'Probe (diagnostic)',
+  name: 'Probe 0.0.7 (diagnostic)',
   popular: () => rows(),
   search: () => rows(),
   async detail(id: string) {

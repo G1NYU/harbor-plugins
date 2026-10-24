@@ -1,9 +1,9 @@
 {
   "id": "probe",
-  "name": "Probe (diagnostic)",
-  "version": "0.0.6",
+  "name": "Probe 0.0.7 (diagnostic)",
+  "version": "0.0.7",
   "lang": "en",
   "nsfw": false,
   "entry": "probe.plugin.js",
-  "description": "Diagnostic: requests an Atsumaru cover and a Wikimedia image with ten header setups and shows the status of each"
+  "description": "Diagnostic: checks batcave.biz (check page, series page, chapter data) and whether harbor.http can send Cookie and Referer headers"
 }
