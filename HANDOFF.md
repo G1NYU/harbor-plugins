@@ -1,4 +1,4 @@
-# Handoff for a new chat (24 Oct 2026, 22:30)
+# Handoff for a new chat (24 Oct 2026, 23:00)
 
 Paste this into a new conversation: "Read HANDOFF.md and then PROGRESS.md in G1NYU/harbor-plugins first (GitHub connector). Then tell me the state in five lines and wait for my pick from the Next list."
 
@@ -23,10 +23,11 @@ Paste this into a new conversation: "Read HANDOFF.md and then PROGRESS.md in G1N
 - The Pages site (`public/index.html`) was successfully updated, including the Legion lines in the Known issues card.
 - The Discord correction about the cover bug was dropped. The user decided not to post it.
 - Probe7 is retired: `plugins/manga/probe/` is now a stub with no `harbor.register` call. Kagane is deleted: `plugins/manga/kagane/` no longer exists.
-- Manga and manhwa work is closed for now. The next focus is eBooks. First candidate: Z-Library. Firefox addon: https://go-to-library.sk/soft/mozilla-addon-latest.xpi?2 . Example entry: https://z-lib.gd/book/arGojLb0rD/the-love-hypothesis.html?dsource=mostpopular .
+- Manga and manhwa work is closed for now. The next focus is eBooks. First candidate: BDeBooks, confirmed feasible by probe. Z-Library was checked and is not a good fit (login, rotating domains, download-first model, no Harbor download-file hook).
+- BDeBooks decision from the user: include all entries, not public-domain-only. The site is community shared from one person to another.
 - Closed with reasons (details in PROGRESS.md): BatCave (Cloudflare 403, cleared cookie does not reach plugin requests), Kagane (needs a proxy and a webview), MangaBuddy (its image hosts refuse requests without a Referer), ReadAllComics, ReadComicsOnline and ZipComic (Cloudflare or unreachable). Judged not worth porting: Mangas.in (see PROGRESS.md).
 - Testing repo after the last deploy: Probe7 (retired stub), Mangasushi, Atsumaru (cover debug). Parked native test plugins stay in the repo as reference (`plugins/manga/mangabuddy-io/`, `plugins/manga/readall-native/`) but are built and then removed from every repo.
-- Latest docs commit when this was written: this Markdown-only update, which grouped Mangapill with Atsumaru in the cover-issue notes and made eBooks the immediate next step.
+- Latest docs commit when this was written: this Markdown-only update, which confirmed BDeBooks as the first eBook plugin candidate and recorded the all-entries decision.
 
 ## Rules learned the hard way
 
@@ -46,20 +47,22 @@ Paste this into a new conversation: "Read HANDOFF.md and then PROGRESS.md in G1N
 
 Manga and manhwa are done for now. The next project is eBooks.
 
-First candidate: Z-Library.
+First candidate: BDeBooks, confirmed feasible by probe.
 
-- Firefox addon download: https://go-to-library.sk/soft/mozilla-addon-latest.xpi?2
-- Example book entry: https://z-lib.gd/book/arGojLb0rD/the-love-hypothesis.html?dsource=mostpopular
+- Search: `https://bdebooks.com/en/search/`
+- Book detail: `https://bdebooks.com/en/books/<slug>/`
+- Chapters: `https://bdebooks.com/en/books/<slug>/read/` (Contents page)
+- Chapter content: `https://bdebooks.com/en/books/<slug>/read/?chapter=<n>`
 
-First questions to answer before writing any plugin:
+Probe findings:
 
-1. What does the Firefox addon actually do (search, mirrors, login, download links)?
-2. Which Z-Library mirror/domain is stable for the user, and does it need login?
-3. What does a book page expose without JavaScript: title, author, cover, formats, download links?
-4. Does Harbor's eBook plugin type (`shared/types/ebook.ts`) support search, details and downloads in the way Z-Library needs?
-5. Are downloads direct files, or do they need a session/interstitial page?
+- Chapter pages are server-rendered HTML, not a JavaScript-only shell.
+- Chapter text is in simple `<h4>` (chapter title) and `<p>` (paragraphs) tags, so `content(chapterId)` can parse it directly.
+- Chapters link to each other with `rel="prev"` and `rel="next"`, and the reader tracks progress.
+- The Contents page at `/read/` lists chapters and links to `?chapter=n`.
+- User decision: include all entries, not public-domain-only. BDeBooks is community shared from one person to another.
 
-Do not write a plugin until these are checked. Probe first, then build.
+Z-Library was checked and parked: login, rotating/personal domains, CAPTCHA, download-first model, and Harbor's eBook plugin type has no download-file hook, so it does not fit.
 
 ## Cleanup checklist (deferred)
 
@@ -74,7 +77,7 @@ Not part of the current eBook phase. Do only if the user asks.
 
 ## Next
 
-1. eBooks: research Z-Library (addon, mirrors, book-page structure, Harbor eBook plugin type, download flow).
+1. Build the BDeBooks eBook plugin: search, detail, chapters, content.
 2. Later, only if asked: manga cleanups (delete `plugins/manga/probe/`, `plugins/manga/mangabuddy-io/`, `plugins/manga/readall-native/`) and the `globalThis` shim move.
 
 ## Where to look

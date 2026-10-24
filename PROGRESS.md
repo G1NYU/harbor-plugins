@@ -1,6 +1,6 @@
 # Progress log
 
-## Handoff (24 Oct 2026, 22:30) - read this first
+## Handoff (24 Oct 2026, 23:00) - read this first
 
 Repo: `G1NYU/harbor-plugins`, branch `main`. Everything is deployed to GitHub Pages by `.github/workflows/deploy.yml` (typecheck, build, validate, update gate, deploy). Deploys take roughly 10-20 minutes and no longer cancel each other (`cancel-in-progress: false`); pushes that only touch `*.md` files do not deploy.
 
@@ -28,7 +28,8 @@ Key files: `scripts/prune-repo.ts` (what is published, plus all test tooling), `
 
 Latest commits, newest first:
 
-- (this commit) docs: group Mangapill with Atsumaru cover issue; make eBooks the immediate next step.
+- (this commit) docs: confirm BDeBooks as first eBook plugin candidate; include all entries.
+- `c4c050d` docs: group Mangapill with Atsumaru cover issue; make eBooks the immediate next step.
 - `6c5ba42` docs: close manga/manhwa phase; record eBook/Z-Library next step and cleanup checklist.
 - `5abdb39` delete `plugins/manga/kagane/manifest.json`.
 - `809c15f` delete `plugins/manga/kagane/index.ts`.
@@ -40,22 +41,24 @@ Latest commits, newest first:
 
 The manga/manhwa phase is closed. Legion Scans is published and working, including search. Asura Scans is published and working. Atsumaru works, but its browse-grid covers still do not render; it stays in the main repo and the Pages Known issues card already says its grid covers do not work. Mangapill had the same browse-grid cover issue and was removed from the main repo because of it. No further cover work is planned for now.
 
-## Next: eBooks (Z-Library)
+## Next: eBooks (BDeBooks)
 
-The next focus is eBooks. First candidate: Z-Library.
+The next focus is eBooks. First candidate: BDeBooks, confirmed feasible by probe.
 
-- Firefox addon download: https://go-to-library.sk/soft/mozilla-addon-latest.xpi?2
-- Example book entry: https://z-lib.gd/book/arGojLb0rD/the-love-hypothesis.html?dsource=mostpopular
+- Search: `https://bdebooks.com/en/search/`
+- Book detail: `https://bdebooks.com/en/books/<slug>/`
+- Chapters: `https://bdebooks.com/en/books/<slug>/read/` (Contents page)
+- Chapter content: `https://bdebooks.com/en/books/<slug>/read/?chapter=<n>`
 
-Before writing any plugin, answer:
+Probe findings:
 
-1. What does the Firefox addon do (search, mirrors, login, download links)?
-2. Which Z-Library mirror/domain is stable for the user, and does it need login?
-3. What does a book page expose without JavaScript: title, author, cover, formats, download links?
-4. Does Harbor's eBook plugin type (`shared/types/ebook.ts`) support search, details and downloads in the way Z-Library needs?
-5. Are downloads direct files, or do they need a session/interstitial page?
+- Chapter pages are server-rendered HTML, not a JavaScript-only shell.
+- Chapter text is in simple `<h4>` (chapter title) and `<p>` (paragraphs) tags, so `content(chapterId)` can parse it directly.
+- Chapters link to each other with `rel="prev"` and `rel="next"`, and the reader tracks progress.
+- The Contents page at `/read/` lists chapters and links to `?chapter=n`.
+- User decision: include all entries, not public-domain-only. BDeBooks is community shared from one person to another.
 
-Probe first, then build. Do not guess.
+Z-Library was checked and parked: login, rotating/personal domains, CAPTCHA, download-first model, and Harbor's eBook plugin type has no download-file hook, so it does not fit.
 
 ## Cleanup checklist (deferred)
 
@@ -179,5 +182,5 @@ Asura Scans (pinned first), Legion Scans (Spanish, second), Atsumaru, Hijala, Ma
 
 ## Next
 
-1. eBooks: research Z-Library (addon, mirrors, book-page structure, Harbor eBook plugin type, download flow).
+1. Build the BDeBooks eBook plugin: search, detail, chapters, content.
 2. Later, only if asked: manga cleanups (delete `plugins/manga/probe/`, `plugins/manga/mangabuddy-io/`, `plugins/manga/readall-native/`) and the `globalThis` shim move.
