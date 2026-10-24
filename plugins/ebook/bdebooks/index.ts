@@ -56,10 +56,21 @@ export const plugin: EBookProvider = {
   async search(query: string, offset: number): Promise<EBookSummary[]> {
     const page = Math.floor(offset / 20) + 1;
     const doc = await getDoc(`/en/search/?q=${encodeURIComponent(query)}&page=${page}`);
-    return doc
+    const results = doc
       .querySelectorAll('a[href*="/books/"]')
       .map(parseBookLink)
       .filter((b): b is EBookSummary => b !== null);
+
+    if (results.length === 0) {
+      return [
+        {
+          id: 'debug-search',
+          title: `SEARCH 0 | ${query}`,
+        },
+      ];
+    }
+
+    return results;
   },
 
   async detail(id: string): Promise<EBookSummary | null> {
@@ -83,6 +94,7 @@ export const plugin: EBookProvider = {
     currentBookId = id;
     const doc = await getDoc(`/en/books/${id}/read/`);
     const links = doc.querySelectorAll('a[href*="chapter="]');
+    const allLinks = doc.querySelectorAll('a');
 
     const chapters: EBookChapter[] = [];
     const seen = new Set<string>();
@@ -107,12 +119,12 @@ export const plugin: EBookProvider = {
     }
 
     if (chapters.length === 0) {
-      chapters.push({
-        id: '1',
-        title: 'Read online',
-        chapter: '1',
-        position: 0,
-      });
+      return [
+        {
+          id: 'debug-chapters',
+          title: `CHAPTERS 0 | LINKS ${allLinks.length}`,
+        },
+      ];
     }
 
     return chapters;
