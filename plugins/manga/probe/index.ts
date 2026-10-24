@@ -3,81 +3,67 @@ import type { MangaProvider, MangaSummary } from '@shared/types/manga.js';
 const API =
   'https://atsu.moe/api/home2/mostBookmarked?offset=0&limit=5&mediums=Comic&types=Manga,Manwha,Manhua,OEL&contentRatings=Safe,Suggestive,Erotica&timeframe=weekly';
 const CDN = 'https://cdn.atsu.moe';
-
-const FIELDS: Array<[string, string]> = [
-  ['img', 'image'],
-  ['sm', 'smallImage'],
-  ['med', 'mediumImage'],
-  ['lg', 'largeImage'],
-];
+const WIKI = 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Fronalpstock_big.jpg/320px-Fronalpstock_big.jpg';
 
 async function get(url: string): Promise<any> {
   return harbor.http(url, { responseType: 'text', timeoutMs: 15000 } as any);
 }
 
-function coverUrl(raw: any): string {
+function atsuCover(raw: any): string {
   const t = typeof raw === 'string' ? raw : raw?.posterMedium ?? raw?.posterSmall ?? raw?.poster;
   if (!t || typeof t !== 'string') return '';
   if (t.startsWith('http')) return t;
   return CDN + (t.startsWith('/') ? t : '/static/' + t);
 }
 
-function brief(r: any): string {
-  const h = r?.headers ?? {};
-  const ct = String(h['content-type'] ?? h['Content-Type'] ?? '?').slice(0, 20);
-  return String(r?.status ?? '?') + ' ' + Math.round(String(r?.body ?? '').length / 1024) + 'KB ' + ct;
+function px(u: string): string {
+  return 'https://wsrv.nl/?url=' + encodeURIComponent(u) + '&w=300&output=jpg';
 }
 
-function errText(e: any): string {
-  return String(e?.message ?? e).slice(0, 60);
-}
-
-async function lines(): Promise<string[]> {
-  const out: string[] = [];
-  let items: any[] = [];
-  try {
-    const r = await get(API);
-    out.push('API: ' + brief(r));
-    const j = JSON.parse(String(r?.body ?? '{}'));
-    items = Array.isArray(j?.items) ? j.items : [];
-    out.push('items: ' + items.length);
-  } catch (e: any) {
-    out.push('API ERR ' + errText(e));
-  }
-
-  for (let n = 0; n < Math.min(items.length, 2); n++) {
-    const item = items[n];
-    out.push('--- series ' + (n + 1));
-    for (const [label, field] of FIELDS) {
-      const url = coverUrl(item[field]);
-      if (!url) {
-        out.push(label + ': none');
-        continue;
-      }
-      const ext = url.split('?')[0].split('.').pop() ?? '?';
-      try {
-        const r = await get(url);
-        out.push(label + ' .' + ext + ' ' + brief(r));
-      } catch (e: any) {
-        out.push(label + ' .' + ext + ' ERR ' + errText(e));
-      }
-    }
-  }
-  return out;
-}
-
-function toRows(ls: string[]): MangaSummary[] {
-  const out: MangaSummary[] = [];
-  for (const l of ls) {
-    for (let i = 0; i < l.length && out.length < 40; i += 34) {
-      out.push({ id: 'r' + out.length, title: l.slice(i, i + 34) } as MangaSummary);
-    }
-  }
-  return out;
+function findUploadUrl(body: string): string {
+  const i = body.indexOf('/wp-content/uploads/');
+  if (i < 0) return '';
+  const start = body.lastIndexOf('http', i);
+  if (start < 0) return '';
+  const ends = ['"', "'", ' ', ')'].map((ch) => body.indexOf(ch, i)).filter((x) => x > 0);
+  if (ends.length === 0) return '';
+  const url = body.slice(start, Math.min(...ends));
+  const lower = url.toLowerCase();
+  const ok = lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.webp');
+  return ok ? url : '';
 }
 
 async function rows(): Promise<MangaSummary[]> {
-  return toRows(await lines());
+  const out: MangaSummary[] = [];
+  out.push({ id: 'a', title: 'A wikimedia direct', cover: WIKI } as MangaSummary);
+  out.push({ id: 'b', title: 'B wikimedia via proxy', cover: px(WIKI) } as MangaSummary);
+
+  let atsu = '';
+  try {
+    const r = await get(API);
+    const j = JSON.parse(String(r?.body ?? '{}'));
+    const it = Array.isArray(j?.items) ? j.items[0] : null;
+    atsu = atsuCover(it?.image);
+  } catch (_) {}
+  if (atsu) {
+    out.push({ id: 'c', title: 'C atsumaru direct', cover: atsu } as MangaSummary);
+    out.push({ id: 'd', title: 'D atsumaru via proxy', cover: px(atsu) } as MangaSummary);
+  } else {
+    out.push({ id: 'c', title: 'C atsumaru API failed' } as MangaSummary);
+  }
+
+  let thunder = '';
+  try {
+    const r = await get('https://en-thunderscans.com/');
+    thunder = findUploadUrl(String(r?.body ?? ''));
+  } catch (_) {}
+  out.push({
+    id: 'e',
+    title: thunder ? 'E thunderscans direct' : 'E thunderscans none found',
+    cover: thunder || undefined,
+  } as MangaSummary);
+
+  return out;
 }
 
 export const plugin: MangaProvider = {
