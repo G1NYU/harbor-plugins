@@ -109,14 +109,14 @@ export const plugin: EBookProvider = {
       const doc = await getDoc(textUrl);
 
       const allLinks = doc.querySelectorAll('a') as any[];
-      const hashLinks = allLinks.filter((a: any) => (a.attr('href') || '').includes('#'));
       const chapters: EBookChapter[] = [];
       const seen = new Set<string>();
 
-      for (const a of hashLinks) {
+      for (const a of allLinks) {
         const href = a.attr('href') || '';
-        const hashIndex = href.indexOf('#');
-        const chapterId = href.slice(hashIndex + 1);
+        if (!href.startsWith('text/') || href === 'text/') continue;
+
+        const chapterId = href.slice(5).replace(/\/$/, '');
         if (!chapterId || seen.has(chapterId)) continue;
 
         const title = a.text().trim();
@@ -132,17 +132,10 @@ export const plugin: EBookProvider = {
       }
 
       if (chapters.length === 0) {
-        const d0 = hashLinks[0]?.attr('href') || 'none';
-        const d1 = hashLinks[1]?.attr('href') || 'none';
-        const d2 = hashLinks[2]?.attr('href') || 'none';
-        const h3 = allLinks[3]?.attr('href') || 'none';
-        const h4 = allLinks[4]?.attr('href') || 'none';
-        const h5 = allLinks[5]?.attr('href') || 'none';
-        const h6 = allLinks[6]?.attr('href') || 'none';
         return [
           {
             id: 'debug-chapters',
-            title: `CHAPTERS 0 | LINKS ${allLinks.length} HASH ${hashLinks.length} | D0 ${d0} | D1 ${d1} | D2 ${d2} | H3 ${h3} | H4 ${h4} | H5 ${h5} | H6 ${h6}`,
+            title: `CHAPTERS 0 | LINKS ${allLinks.length} | ${textUrl}`,
           },
         ];
       }
@@ -159,29 +152,9 @@ export const plugin: EBookProvider = {
   },
 
   async content(chapterId: string): Promise<string> {
-    const textUrl = `${currentBookUrl}text/`;
-    const doc = await getDoc(textUrl);
-
-    const start = doc.querySelector(`#${chapterId}`) as any;
-    if (!start || !start.nextElementSibling) {
-      return extractProse(doc, 'body', 'p');
-    }
-
-    const parts: string[] = [];
-    let el = start.nextElementSibling as any;
-
-    while (el) {
-      if (el.attr && el.attr('id')) break;
-      const text = el.text ? el.text().trim() : '';
-      if (text) parts.push(text);
-      el = el.nextElementSibling;
-    }
-
-    if (parts.length === 0) {
-      return extractProse(doc, 'body', 'p');
-    }
-
-    return parts.join('\n\n');
+    const chapterUrl = `${currentBookUrl}text/${chapterId}/`;
+    const doc = await getDoc(chapterUrl);
+    return extractProse(doc, 'body', 'p');
   },
 
   async tags() {
