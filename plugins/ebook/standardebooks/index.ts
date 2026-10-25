@@ -109,15 +109,15 @@ export const plugin: EBookProvider = {
       const doc = await getDoc(textUrl);
 
       const allLinks = doc.querySelectorAll('a') as any[];
+      const hashLinks = allLinks.filter((a: any) => (a.attr('href') || '').includes('#'));
       const chapters: EBookChapter[] = [];
       const seen = new Set<string>();
 
-      for (const a of allLinks) {
+      for (const a of hashLinks) {
         const href = a.attr('href') || '';
-        if (!href.startsWith('#') || href.length < 2) continue;
-
-        const chapterId = href.slice(1);
-        if (seen.has(chapterId)) continue;
+        const hashIndex = href.indexOf('#');
+        const chapterId = href.slice(hashIndex + 1);
+        if (!chapterId || seen.has(chapterId)) continue;
 
         const title = a.text().trim();
         if (!title) continue;
@@ -132,13 +132,17 @@ export const plugin: EBookProvider = {
       }
 
       if (chapters.length === 0) {
-        const h0 = allLinks[0]?.attr('href') || 'none';
-        const h1 = allLinks[1]?.attr('href') || 'none';
-        const h2 = allLinks[2]?.attr('href') || 'none';
+        const d0 = hashLinks[0]?.attr('href') || 'none';
+        const d1 = hashLinks[1]?.attr('href') || 'none';
+        const d2 = hashLinks[2]?.attr('href') || 'none';
+        const h3 = allLinks[3]?.attr('href') || 'none';
+        const h4 = allLinks[4]?.attr('href') || 'none';
+        const h5 = allLinks[5]?.attr('href') || 'none';
+        const h6 = allLinks[6]?.attr('href') || 'none';
         return [
           {
             id: 'debug-chapters',
-            title: `CHAPTERS 0 | LINKS ${allLinks.length} | H0 ${h0} | H1 ${h1} | H2 ${h2}`,
+            title: `CHAPTERS 0 | LINKS ${allLinks.length} HASH ${hashLinks.length} | D0 ${d0} | D1 ${d1} | D2 ${d2} | H3 ${h3} | H4 ${h4} | H5 ${h5} | H6 ${h6}`,
           },
         ];
       }
