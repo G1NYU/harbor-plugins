@@ -132,10 +132,13 @@ export const plugin: EBookProvider = {
       }
 
       if (chapters.length === 0) {
+        const h0 = allLinks[0]?.attr('href') || 'none';
+        const h1 = allLinks[1]?.attr('href') || 'none';
+        const h2 = allLinks[2]?.attr('href') || 'none';
         return [
           {
             id: 'debug-chapters',
-            title: `CHAPTERS 0 | LINKS ${allLinks.length} | ${textUrl}`,
+            title: `CHAPTERS 0 | LINKS ${allLinks.length} | H0 ${h0} | H1 ${h1} | H2 ${h2}`,
           },
         ];
       }
