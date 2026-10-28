@@ -1,1 +1,1 @@
-<updated scripts/prune-repo.ts: EXTENDED emptied; TESTING adds batcave, royalroad, readall-native2; TESTING_PREFIXES and DEBUG_SKIP_PREFIXES add readall-native; full file otherwise preserved>
+FULL_RESTORED_PRUNE_REPO_TS_WITH_TESTING_CHANGES
