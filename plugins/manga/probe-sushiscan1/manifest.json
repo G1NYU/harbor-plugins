@@ -1,0 +1,10 @@
+{
+  "id": "probe-sushiscan1",
+  "name": "Probe SushiScan FR v1",
+  "version": "0.0.1",
+  "lang": "fr",
+  "nsfw": false,
+  "entry": "probe-sushiscan1.plugin.js",
+  "description": "Diagnostic for sushiscan.net: HTML, chapters, embedded reader images, and plain image-host requests.",
+  "website": "https://sushiscan.net"
+}
