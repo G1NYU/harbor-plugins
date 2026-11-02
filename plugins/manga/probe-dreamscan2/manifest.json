@@ -1,0 +1,10 @@
+{
+  "id": "probe-dreamscan2",
+  "name": "Probe DreamScan FR v2",
+  "version": "0.0.1",
+  "lang": "fr",
+  "nsfw": false,
+  "entry": "probe-dreamscan2.plugin.js",
+  "description": "Reader image diagnostic: page candidates in HTML, scripts, JSON, srcset, alternative chapters and language variants.",
+  "website": "https://dreamscan.cc"
+}
