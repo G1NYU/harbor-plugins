@@ -99,6 +99,7 @@ const EXTENDED = new Set<string>([]);
 
 // Clean testing sources: shown in repo-testing.json without debug cards
 const TESTING = new Set<string>([
+  'probe-toocomic-reader3',
   'probe-toocomic-reader2',
   'probe-toocomic-reader1',
   'probe-toocomic1',
@@ -116,6 +117,7 @@ const TESTING_PREFIXES: string[] = [];
 
 // No debug wrapper is applied in the clean testing build.
 const DEBUG_SKIP = new Set<string>([
+  'probe-toocomic-reader3',
   'probe-toocomic-reader2',
   'probe-toocomic-reader1',
   'probe-toocomic1',

@@ -1,0 +1,10 @@
+{
+  "id": "probe-toocomic-reader3",
+  "name": "TooComic FR (Reader Beta v3)",
+  "version": "0.3.0",
+  "lang": "fr",
+  "nsfw": false,
+  "entry": "probe-toocomic-reader3.plugin.js",
+  "description": "Testing-only full chapter list beta. Tries archive pagination and verifies oldest/missing numbered chapters; preserves proven v2 reader images.",
+  "website": "https://www.toocomic.com/fr/"
+}
