@@ -1,0 +1,10 @@
+{
+  "id": "probe-dreamscan1",
+  "name": "Probe DreamScan FR v1",
+  "version": "0.0.1",
+  "lang": "fr",
+  "nsfw": false,
+  "entry": "probe-dreamscan1.plugin.js",
+  "description": "Native DreamScan diagnostic: homepage, catalogue, reader HTML, image CDN, series links and search discovery.",
+  "website": "https://dreamscan.cc"
+}
