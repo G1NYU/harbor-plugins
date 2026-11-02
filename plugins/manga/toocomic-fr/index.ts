@@ -1,10 +1,10 @@
 /**
- * TooComic FR — Harbor MangaProvider (main manga repository).
+ * 🇫🇷 TooComic FR — Harbor MangaProvider (main manga repository).
  * Origin: user's confirmed accessible chapter/series at www.toocomic.com.
  * No external runtime, browser globals, webview, cookies, or proxy required.
  *
- * User-confirmed: chapters 29–38 load with images in Harbor.
- * Other catalogue, search, and chapter coverage is not fully verified.
+ * Chapter discovery tested in Harbor across multiple series, including chapters 1 and 2.
+ * Retains beta v4 long-series logic and working image reader.
  */
 import type { MangaChapter, MangaProvider, MangaSummary } from '@shared/types/manga.js';
 
@@ -167,6 +167,197 @@ function chapterList(html: string, series: string): MangaChapter[] {
   return out;
 }
 
+// v4: no assumption that an archive ends near chapter 400 or has only 15 pages.
+// The base page may contain only the ten newest chapter links.
+// Preserve actual site links; infer numbered URLs only after representative
+// chapter pages have been verified with real reader images.
+function mergeChapters(into: MangaChapter[], additional: MangaChapter[]): number {
+  const seen = new Set(into.map(x => matchPath(x.id)));
+  let inserted = 0;
+  for (const chapter of additional) {
+    const key = matchPath(chapter.id);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    into.push(chapter);
+    inserted++;
+  }
+  return inserted;
+}
+function chapterSort(chapters: MangaChapter[]): MangaChapter[] {
+  return chapters.sort((a, b) => parseFloat(String(b.chapter ?? '0')) - parseFloat(String(a.chapter ?? '0')));
+}
+
+// The site could expose pagination in either an archive path or query string.
+// Only follow links that keep the same manga series path.
+type Pager = { path: (page: number) => string; last: number | null };
+function discoverPager(html: string, series: string): Pager | null {
+  const links = html.match(/<a\b[^>]*>/gi) || [];
+  const candidates: { page: number; type: string; path: string }[] = [];
+  const seriesKey = matchPath(series);
+  for (const link of links) {
+    const path = localPath(attr(link, 'href'));
+    if (!path || !matchPath(path).startsWith(seriesKey)) continue;
+    let m: RegExpExecArray | null;
+    if ((m = /\/page\/(\d+)\/?(?:[?#]|$)/i.exec(path))) {
+      candidates.push({ page: Number(m[1]), type: 'pretty', path });
+    } else if ((m = /[?&](page|paged|chapter_page|chapters_page)=(\d+)/i.exec(path))) {
+      candidates.push({ page: Number(m[2]), type: m[1].toLowerCase(), path });
+    }
+  }
+  const valid = candidates.filter(c => c.page >= 2 && c.page <= 1000);
+  if (!valid.length) return null;
+  const chosen = valid.find(c => c.page === 2) || valid[0];
+  const last = Math.max(...valid.filter(c => c.type === chosen.type).map(c => c.page));
+  if (chosen.type === 'pretty') return {
+    path: p => series + 'page/' + p + '/', last: last > 2 ? last : null,
+  };
+  return {
+    path: p => series + '?' + chosen.type + '=' + p, last: last > 2 ? last : null,
+  };
+}
+async function paginatedChapters(series: string, initialHtml: string, initial: MangaChapter[]): Promise<MangaChapter[]> {
+  const out = initial.slice();
+  const candidates: Pager[] = [];
+  const discover = discoverPager(initialHtml, series);
+  if (discover) candidates.push(discover);
+  // Sites may not show page 2 in the initial HTML, so probe the standard forms.
+  candidates.push({ path: p => series + 'page/' + p + '/', last: null });
+  candidates.push({ path: p => series + '?paged=' + p, last: null });
+  candidates.push({ path: p => series + '?page=' + p, last: null });
+  const attempted = new Set<string>();
+  for (const pager of candidates) {
+    let page2 = '';
+    const url = pager.path(2);
+    if (attempted.has(url)) continue;
+    attempted.add(url);
+    try { page2 = await get(url); } catch (_e) { continue; }
+    if (!mergeChapters(out, chapterList(page2, series))) continue;
+    const onSecond = discoverPager(page2, series);
+    const last = Math.max(pager.last || 0, onSecond?.last || 0);
+    // Jump to the last linked archive when possible. This is much cheaper
+    // than fetching 100+ lists just to discover the earliest chapter.
+    if (last > 3) {
+      try { mergeChapters(out, chapterList(await get(pager.path(last)), series)); }
+      catch (_e) { /* Pagination may have changed. */ }
+    }
+    // Collect a bounded sample of real archive pages; numbered discovery
+    // below handles large, regular ranges without one request per 10 links.
+    const maxPages = last > 0 ? Math.min(last, 12) : 12;
+    for (let page = 3; page <= maxPages; page++) {
+      try { if (!mergeChapters(out, chapterList(await get(pager.path(page)), series))) break; }
+      catch (_e) { break; }
+    }
+    break;
+  }
+  return chapterSort(out);
+}
+
+interface NumberedPattern { prefix: string; suffix: string; min: number; max: number; present: number[]; }
+function numberedPattern(chapters: MangaChapter[]): NumberedPattern | null {
+  // The latest ten can include a special chapter or renamed URL. Use the
+  // dominant common pattern instead of requiring every single row to match.
+  const groups: Record<string, { prefix: string; suffix: string; nums: number[] }> = {};
+  for (const ch of chapters) {
+    const m = /^(.*?chapitre[-_])(\d+)([^/?#]*\.html)$/i.exec(withoutQuery(ch.id));
+    if (!m) continue;
+    const n = Number(m[2]);
+    if (!Number.isSafeInteger(n) || n < 1 || n > 10000) continue;
+    const key = matchPath(m[1]) + m[3].toLowerCase();
+    if (!groups[key]) groups[key] = { prefix: m[1], suffix: m[3], nums: [] };
+    groups[key].nums.push(n);
+  }
+  const ranked = Object.values(groups).sort((a, b) => b.nums.length - a.nums.length);
+  if (!ranked.length) return null;
+  const g = ranked[0];
+  const nums = Array.from(new Set(g.nums)).sort((a, b) => a - b);
+  if (nums.length < 3) return null;
+  const joined = nums.filter((n, i) => i && n === nums[i - 1] + 1).length;
+  if (joined < 2 || nums.length < Math.min(chapters.length, 4) * 0.6) return null;
+  return { prefix: g.prefix, suffix: g.suffix, min: nums[0], max: nums[nums.length - 1], present: nums };
+}
+async function verifyChapter(path: string, number: number): Promise<boolean> {
+  try {
+    const html = await get(path);
+    const title = meta(html, 'og:title') ||
+      textOnly((/<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(html) || ['', ''])[1]);
+    const canonical = meta(html, 'og:url') ||
+      attr((html.match(/<link\b[^>]*rel=["']canonical["'][^>]*>/i) || [''])[0], 'href');
+    const chapterTitleMatches = new RegExp('chapitre[-_\\s]*0*' + number + '(?!\\d)', 'i').test(title);
+    const canonicalMatches = !!canonical && matchPath(localPath(canonical)) === matchPath(path);
+    if (!chapterTitleMatches && !canonicalMatches) return false;
+    return readerImageUrls(html).length > 0;
+  } catch (_e) { return false; }
+}
+async function expandNumberedChapters(chapters: MangaChapter[]): Promise<MangaChapter[]> {
+  const pattern = numberedPattern(chapters);
+  if (!pattern) return chapters;
+  const make = (n: number) => pattern.prefix + n + pattern.suffix;
+  let earliest = pattern.min;
+  if (pattern.min > 1) {
+    const preceding = pattern.min - 1;
+    // We only extrapolate below the oldest known URL if its immediate
+    // predecessor is an actual chapter page with reader images.
+    if (await verifyChapter(make(preceding), preceding)) {
+      earliest = preceding;
+      if (await verifyChapter(make(1), 1)) earliest = 1;
+      else {
+        // Some series do not begin at chapter 1. Locate their accessible
+        // lower boundary with O(log N) probes, rather than making up links.
+        let notFound = 1, found = preceding;
+        while (found - notFound > 1) {
+          const mid = Math.floor((found + notFound) / 2);
+          if (await verifyChapter(make(mid), mid)) found = mid;
+          else notFound = mid;
+        }
+        earliest = found;
+      }
+    }
+  }
+
+  // When pagination jumps straight to the last page, the index contains
+  // 1..10 and 991..1000 but not the middle. Find and verify *every gap* in
+  // the observed numeric sequence rather than stopping just because 1 exists.
+  const present = new Set(pattern.present);
+  const runs: Array<{ first: number; last: number }> = [];
+  for (let n = earliest; n <= pattern.max;) {
+    if (present.has(n)) { n++; continue; }
+    const first = n;
+    while (n <= pattern.max && !present.has(n)) n++;
+    runs.push({ first, last: n - 1 });
+  }
+  // A small request budget protects Harbor against malformed archives.
+  let budget = 30;
+  const inferred: MangaChapter[] = [];
+  for (const run of runs) {
+    const length = run.last - run.first + 1;
+    const picks = length <= 6
+      ? Array.from({ length }, (_, i) => run.first + i)
+      : [run.first, run.last,
+          run.first + Math.floor(length * 0.25),
+          run.first + Math.floor(length * 0.50),
+          run.first + Math.floor(length * 0.75)];
+    const sample = Array.from(new Set(picks));
+    if (sample.length > budget) break;
+    budget -= sample.length;
+    const results = await Promise.all(sample.map(n => verifyChapter(make(n), n)));
+    if (results.some(ok => !ok)) continue;
+    for (let n = run.first; n <= run.last; n++) {
+      inferred.push({ id: make(n), chapter: String(n), title: 'Chapitre ' + n, pages: 0, language: 'fr' });
+    }
+  }
+  mergeChapters(chapters, inferred);
+  return chapterSort(chapters);
+}
+async function allChapters(series: string): Promise<MangaChapter[]> {
+  const html = await get(series);
+  const visible = chapterList(html, series);
+  if (!visible.length) return [];
+  const paginated = await paginatedChapters(series, html, visible);
+  // A page containing chapter 1 is not necessarily the *full* index; the
+  // site might have jumped from the newest ten directly to the first ten.
+  return await expandNumberedChapters(paginated);
+}
+
 interface ImageHit { url: string; score: number; index: number; }
 function isUsefulPage(url: string): boolean {
   const u = url.toLowerCase();
@@ -258,7 +449,7 @@ const plugin: MangaProvider = {
     const series = localPath(id.startsWith('/') ? BASE + id : id);
     if (!series || !isSeries(series)) return [];
     try {
-      const chapters = chapterList(await get(series), withoutQuery(series).replace(/\/?$/, '/'));
+      const chapters = await allChapters(withoutQuery(series).replace(/\/?$/, '/'));
       if (chapters.length) return chapters;
       return [debugChapter(series, 'NO chapters found on series page')];
     } catch (e) { return [debugChapter(series, 'ERR chapters: ' + err(e))]; }
