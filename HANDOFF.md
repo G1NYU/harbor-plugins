@@ -1,5 +1,17 @@
 # Handoff for a new chat (24 Oct 2026, 23:00)
 
+## SushiScan FR follow-up (2 Nov 2026): parked due to image HTTP 403
+
+User-tested in the installed Harbor reader with `Probe SushiScan FR v1` (`probe-sushiscan1`); diagnostic was committed as `33553e3` and successfully deployed.
+
+- `https://sushiscan.net/black-clover-chapitre-392/`: HTTP 200, 717659 HTML characters, `readerarea` present, `ts_reader` present, 20 page image URLs extracted.
+- Reader images use `c.sushiscan.net` with WordPress uploads/webp paths. A **plain `harbor.http` request to the first page image returned HTTP 403**, with a 6064-character response body. No successful image download is established.
+- Series URL `/catalogue/black-clover/`: HTTP 200, 760690 HTML characters, 23 matching chapter hrefs and 187 chapter-class occurrences (these are diagnostic matches, not a verified count of distinct chapters).
+- Catalogue `/catalogue/`: HTTP 200, 789153 HTML characters, 30 `bsx` item matches and 91 series-link matches (not necessarily 91 unique series).
+- **Decision:** do not publish SushiScan to the main manga repository. Park it as **blocked on image delivery**. The 403 does not by itself establish whether the cause is Cloudflare, missing Referer/Cookie, or another anti-hotlink rule. Harbor's previously observed stripping of Referer/Cookie is relevant but not proof.
+- Keep the already deployed `probe-sushiscan1` testing source for reference. No bypass, proxy, or alternate image host has been validated.
+- Next user-requested candidate: `https://dreamscan.cc/`. Do not infer its site structure or Harbor compatibility from SushiScan. Test fresh HTML, series/chapter URLs, image URLs and a plain image download before considering publication.
+
 Paste this into a new conversation: "Read HANDOFF.md and then PROGRESS.md in G1NYU/harbor-plugins first (GitHub connector). Then tell me the state in five lines and wait for my pick from the Next list."
 
 ## What this project is
