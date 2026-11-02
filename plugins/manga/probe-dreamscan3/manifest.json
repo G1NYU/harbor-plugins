@@ -1,0 +1,10 @@
+{
+  "id": "probe-dreamscan3",
+  "name": "Probe DreamScan FR v3",
+  "version": "0.0.1",
+  "lang": "fr",
+  "nsfw": false,
+  "entry": "probe-dreamscan3.plugin.js",
+  "description": "Testing-only dynamic DreamScan catalogue, series, chapter, reader script and image diagnostics. No hardcoded manga title.",
+  "website": "https://dreamscan.cc"
+}
