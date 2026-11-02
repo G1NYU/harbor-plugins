@@ -1,0 +1,10 @@
+{
+  "id": "probe-toocomic-reader4",
+  "name": "TooComic FR (Reader Beta v4)",
+  "version": "0.4.0",
+  "lang": "fr",
+  "nsfw": false,
+  "entry": "probe-toocomic-reader4.plugin.js",
+  "description": "Long-series chapter index test: pagination discovery plus verified numeric ranges, including 1000+ chapters. Reader code unchanged.",
+  "website": "https://www.toocomic.com/fr/"
+}
