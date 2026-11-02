@@ -1,0 +1,10 @@
+{
+  "id": "probe-toocomic1",
+  "name": "Probe TooComic FR v1",
+  "version": "0.0.1",
+  "lang": "fr",
+  "nsfw": false,
+  "entry": "probe-toocomic1.plugin.js",
+  "description": "Compatibility diagnostic for user-supplied TooComic chapter 37: HTML, reader structure and direct page image requests.",
+  "website": "https://www.toocomic.com"
+}
