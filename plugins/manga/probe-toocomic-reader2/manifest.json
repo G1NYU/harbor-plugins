@@ -1,0 +1,10 @@
+{
+  "id": "probe-toocomic-reader2",
+  "name": "TooComic FR (Reader Beta v2)",
+  "version": "0.2.0",
+  "lang": "fr",
+  "nsfw": false,
+  "entry": "probe-toocomic-reader2.plugin.js",
+  "description": "Testing-only reader beta: fixes case-insensitive encoded chapter URLs and excessive SEO titles; reader images still require Harbor verification.",
+  "website": "https://www.toocomic.com/fr/"
+}
