@@ -8,6 +8,7 @@ const DIST = path.join(process.cwd(), 'dist', 'manga');
 const ORDER = [
   'asura-seanime',
   'legion-scans',
+  'toocomic-fr',
   'weebcentral',
   'kaynscan',
   'projectsuki',
@@ -52,6 +53,7 @@ const ORDER = [
 const KEEP = new Set([
   'asura-seanime',
   'legion-scans',
+  'toocomic-fr',
   'flamecomics',
   'hivetoons',
   'weebcentral',

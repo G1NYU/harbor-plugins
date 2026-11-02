@@ -1,0 +1,10 @@
+{
+  "id": "toocomic-fr",
+  "name": "🇫🇷 TooComic FR",
+  "version": "1.0.0",
+  "lang": "fr",
+  "nsfw": false,
+  "entry": "toocomic-fr.plugin.js",
+  "description": "French manga and manhwa from TooComic. Chapter reading verified in Harbor for 101e Confession chapters 29–38; wider browsing and search still to be verified.",
+  "website": "https://www.toocomic.com/fr/"
+}
