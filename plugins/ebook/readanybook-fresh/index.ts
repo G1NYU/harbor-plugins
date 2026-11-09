@@ -97,9 +97,8 @@ async function browse(q: string, offset: number): Promise<EBookSummary[]> {
   try {
     const doc = await harbor.parseHtml(await get(BASE + (q ? '/search?q=' + encodeURIComponent(q) : '/')));
     const out = new Map<string, EBookSummary>();
-    const container = q ? '.search-books:not(.ext-net)' : '.main-list';
-    if (!doc.querySelector(container)) throw new Error('Expected catalogue container not found: ' + container);
-    for (const card of doc.querySelectorAll(container + ' .book-preview')) {
+    if (!q && !doc.querySelector('.main-list')) throw new Error('Expected main catalogue container not found');
+    for (const card of doc.querySelectorAll(q ? '.book-preview' : '.main-list .book-preview')) {
       const a = card.querySelector('.preview-name a'); const id = path(a?.attr('href') || ''); const title = a?.text().trim();
       if (!id || !title) continue;
       const img = card.querySelector('img');
