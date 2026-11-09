@@ -6,6 +6,7 @@ function attr(tag: string, key: string): string { return new RegExp('\\b' + key 
 function value(xml: string, key: string): string { return (new RegExp('<dc:' + key + '\\b[^>]*>([\\s\\S]*?)<\\/dc:' + key + '>', 'i').exec(xml)?.[1] || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&apos;/g, "'").replace(/&quot;/g, '"').trim(); }
 function tokens(s: string): string[] { return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/['’]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').split(' ').filter(t => t.length > 1 && !['the','and','of','book','one','two','three','epub','online'].includes(t)); }
 function matches(title: string, other: string): boolean { const wanted = Array.from(new Set(tokens(title))); const actual = new Set(tokens(other)); return wanted.length > 0 && wanted.filter(t => actual.has(t)).length / wanted.length >= 0.75; }
+function containsAll(expected: string, label: string): boolean { const wanted = tokens(expected); const actual = new Set(tokens(label)); return wanted.length > 0 && wanted.every(t => actual.has(t)); }
 function resource(base: string, relative: string): string {
   const root = /^https:\/\/files\.readanybook\.com\/\d+\/epub\/[^/?#]+\//i.exec(base)?.[0];
   if (!root || !base.startsWith(root)) throw new Error('Invalid reader package base');
@@ -54,11 +55,13 @@ async function discover(id: string): Promise<Loaded> {
   const author = doc.querySelector('.book-details .authors-list')?.text().trim() || summaries.get(id)?.author || '';
   if (!title) throw new Error('Book page: missing selected title');
   const candidates: string[] = [];
+  const labels = new Map<string, string[]>();
   const rows = doc.querySelectorAll('.book-mini-reader .reader-files .links-row[data-link]');
   for (const row of rows) {
     const label = row.querySelector('.links-name')?.text() || ''; const root = abs(row.attr('data-link') || '');
     if (!matches(title, label) || !/^https:\/\/files\.readanybook\.com\/\d+\/epub\/[^/?#]+\/?$/i.test(root)) continue;
     const base = root.replace(/\/?$/, '/'); if (!candidates.includes(base)) candidates.push(base);
+    labels.set(base, [...(labels.get(base) || []), label]);
   }
   if (!candidates.length) throw new Error('Selection: no matching package among ' + rows.length + ' reader files for ' + title);
   const reasons: string[] = [];
@@ -71,7 +74,9 @@ async function discover(id: string): Promise<Loaded> {
       stage = 'package metadata'; const xml = await get(opfUrl);
       const epubTitle = value(xml, 'title'); const epubAuthor = value(xml, 'creator');
       stage = 'identity';
-      if (!matches(title, epubTitle)) throw new Error('Title mismatch: expected ' + title + '; found ' + (epubTitle || '[missing]'));
+      const opaqueTitle = /^[a-f0-9]{32}(?:[a-f0-9]{8}|[a-f0-9]{32})?$/i.test(epubTitle);
+      const labelVerified = (labels.get(root) || []).some(label => containsAll(title, label) && containsAll(author, label));
+      if (!matches(title, epubTitle) && !(opaqueTitle && labelVerified)) throw new Error('Title mismatch: expected ' + title + '; found ' + (epubTitle || '[missing]') + '; package author=' + (epubAuthor || '[missing]') + '; strict file-label match=' + labelVerified);
       if ((tokens(title).length === 1 && tokens(title)[0].length <= 2) && (!author || !epubAuthor)) throw new Error('Short title requires author metadata');
       if (author && epubAuthor && !tokens(author).some(t => tokens(epubAuthor).includes(t))) throw new Error('Author mismatch: expected ' + author + '; found ' + epubAuthor);
       stage = 'spine';
@@ -84,7 +89,8 @@ async function discover(id: string): Promise<Loaded> {
       for (const tag of spine.match(/<itemref\b[^>]*>/gi) || []) { const item = items.get(attr(tag, 'idref')); if (!item || !['application/xhtml+xml','text/html'].includes(item.type)) continue; const url = resource(base, item.href); sections.push({ id: id + '|' + url, title: 'Section ' + (sections.length + 1), position: sections.length }); }
       if (!sections.length) throw new Error('No readable spine sections; manifest items=' + items.size);
       const cover = abs(doc.querySelector('.book-cover a.gallery-item')?.attr('href') || summaries.get(id)?.cover || '');
-      return { sections, summary: { id, title, author: author || epubAuthor || undefined, cover: cover || undefined, siteUrl: BASE + id, description: doc.querySelector('.book-description .visible-text')?.text().trim() || 'Reader package title verified.' } };
+      const identityNote = opaqueTitle ? 'Reader identity uses the selected page file label (title and author); internal title is an opaque identifier.' : 'Reader package title verified.';
+      return { sections, summary: { id, title, author: author || epubAuthor || undefined, cover: cover || undefined, siteUrl: BASE + id, description: [doc.querySelector('.book-description .visible-text')?.text().trim(), identityNote].filter(Boolean).join('\n\n') } };
     } catch (e) { reasons.push(stage + ': ' + String(e) + '\nPackage: ' + root); }
   }
   throw new Error(reasons.join('\n\n'));
@@ -102,7 +108,7 @@ export const plugin: EBookProvider = {
     try { return (await load(id)).sections; } catch { return [{ id: 'reader-diagnostic|' + id, title: 'Reader failed — open diagnostic (not a book chapter)', position: 0 }]; }
   },
   async content(id: string) {
-    if (id.startsWith('reader-diagnostic|')) { const bookId = id.slice('reader-diagnostic|'.length); if (path(BASE + bookId) !== bookId) throw new Error('Invalid diagnostic'); return 'ReadAnyBook Beta 0.1.1 reader diagnostic\n\nThis is an error report, not book content.\n\n' + (failures.get(bookId) || 'Error expired; reopen the book to retry.'); }
+    if (id.startsWith('reader-diagnostic|')) { const bookId = id.slice('reader-diagnostic|'.length); if (path(BASE + bookId) !== bookId) throw new Error('Invalid diagnostic'); return 'ReadAnyBook Beta 0.1.2 reader diagnostic\n\nThis is an error report, not book content.\n\n' + (failures.get(bookId) || 'Error expired; reopen the book to retry.'); }
     const split = id.indexOf('|'); if (split < 0) throw new Error('Invalid section');
     const book = await load(id.slice(0, split)); if (!book.sections.some(section => section.id === id)) throw new Error('Unknown section');
     const html = await get(id.slice(split + 1)); const body = /<body\b[^>]*>([\s\S]*?)<\/body>/i.exec(html)?.[1];
