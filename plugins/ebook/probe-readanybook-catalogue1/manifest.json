@@ -1,0 +1,1 @@
+{"id":"probe-readanybook-catalogue1","name":"ReadAnyBook Catalogue Test v1","version":"0.0.1","lang":"en","nsfw":false,"entry":"probe-readanybook-catalogue1.plugin.js","description":"Tests real home/search book cards and discovers reader files from each selected book. Diagnostic details, no reading yet.","website":"https://www.readanybook.com/"}
