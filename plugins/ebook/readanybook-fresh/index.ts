@@ -81,7 +81,7 @@ async function labelSections(sections: EBookChapter[], base: string, xml: string
   }));
   const totals = new Map<string, number>();
   for (const section of sections) {
-    section.title = names.get(sectionUrl(section)) || 'Untitled section ' + ((section.position || 0) + 1);
+    section.title = names.get(sectionUrl(section)) || 'Reading section ' + ((section.position || 0) + 1);
     const key = section.title.toLowerCase(); totals.set(key, (totals.get(key) || 0) + 1);
   }
   for (const section of sections) {
@@ -159,7 +159,7 @@ async function discover(id: string): Promise<Loaded> {
       const items = new Map<string, Item>();
       for (const tag of manifest.match(/<item\b[^>]*>/gi) || []) items.set(attr(tag, 'id'), { href: attr(tag, 'href'), type: attr(tag, 'media-type'), properties: attr(tag, 'properties') });
       const sections: EBookChapter[] = [];
-      for (const tag of spine.match(/<itemref\b[^>]*>/gi) || []) { const item = items.get(attr(tag, 'idref')); if (!item || !['application/xhtml+xml','text/html'].includes(item.type)) continue; const url = resource(base, item.href); sections.push({ id: id + '|' + url, title: 'Untitled section ' + (sections.length + 1), position: sections.length }); }
+      for (const tag of spine.match(/<itemref\b[^>]*>/gi) || []) { const item = items.get(attr(tag, 'idref')); if (!item || !['application/xhtml+xml','text/html'].includes(item.type)) continue; const url = resource(base, item.href); sections.push({ id: id + '|' + url, title: 'Reading section ' + (sections.length + 1), position: sections.length }); }
       if (!sections.length) throw new Error('No readable spine sections; manifest items=' + items.size);
       try { await labelSections(sections, base, xml, items, spineMatch?.[0] || ''); } catch {}
       const cover = abs(doc.querySelector('.book-cover a.gallery-item')?.attr('href') || summaries.get(id)?.cover || '');
