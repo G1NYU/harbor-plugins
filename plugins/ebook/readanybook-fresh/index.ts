@@ -1,6 +1,6 @@
 import type { EBookProvider, EBookSummary, EBookChapter } from '../../../shared/types/ebook.js';
 const BASE = 'https://www.readanybook.com';
-const DIAG = 'readanybook-fresh-diagnostic|';
+const DIAG = 'readanybook-fresh-authorfix-diagnostic|';
 function abs(s: string): string { s = String(s || '').replace(/&amp;/g, '&').trim(); return s.startsWith('//') ? 'https:' + s : s.startsWith('/') ? BASE + s : /^https?:\/\//i.test(s) ? s.replace(/^http:/i, 'https:') : ''; }
 function path(s: string): string { return /^https:\/\/(?:www\.)?readanybook\.com(\/ebook\/[a-z0-9-]+-\d+)\/?(?:[?#].*)?$/i.exec(abs(s))?.[1] || ''; }
 function attr(tag: string, key: string): string { return new RegExp('\\b' + key + '\\s*=\\s*["\x27]([^"\x27]*)["\x27]', 'i').exec(tag)?.[1].replace(/&amp;/g, '&') || ''; }
@@ -73,11 +73,13 @@ async function discover(id: string): Promise<Loaded> {
       const rootfile = container.match(/<rootfile\b[^>]*>/i)?.[0] || '';
       const opfUrl = resource(root, attr(rootfile, 'full-path'));
       stage = 'package metadata'; const xml = await get(opfUrl);
-      const epubTitle = value(xml, 'title'); const epubAuthor = value(xml, 'creator');
+      const epubTitle = value(xml, 'title'); const rawAuthor = value(xml, 'creator');
+      const epubAuthor = /^unknown$/i.test(rawAuthor.trim()) ? '' : rawAuthor;
       stage = 'identity';
       const opaqueTitle = /^[a-f0-9]{32}(?:[a-f0-9]{8}|[a-f0-9]{32})?$/i.test(epubTitle);
       const labelVerified = (labels.get(root) || []).some(label => containsAll(title, label) && containsAll(author, label));
-      if (!matches(title, epubTitle) && !(opaqueTitle && labelVerified)) throw new Error('Title mismatch: expected ' + title + '; found ' + (epubTitle || '[missing]') + '; package author=' + (epubAuthor || '[missing]') + '; strict file-label match=' + labelVerified);
+      if (!matches(title, epubTitle) && !(opaqueTitle && labelVerified)) throw new Error('Title mismatch: expected ' + title + '; found ' + (epubTitle || '[missing]') + '; package author=' + (rawAuthor || '[missing]') + '; strict file-label match=' + labelVerified);
+      if (!epubAuthor && !labelVerified) throw new Error('Missing author metadata requires full title and author in the selected file label; package author=' + (rawAuthor || '[missing]'));
       if ((tokens(title).length === 1 && tokens(title)[0].length <= 2) && (!author || !epubAuthor)) throw new Error('Short title requires author metadata');
       if (author && epubAuthor && !tokens(author).some(t => tokens(epubAuthor).includes(t))) throw new Error('Author mismatch: expected ' + author + '; found ' + epubAuthor);
       stage = 'spine';
@@ -90,7 +92,7 @@ async function discover(id: string): Promise<Loaded> {
       for (const tag of spine.match(/<itemref\b[^>]*>/gi) || []) { const item = items.get(attr(tag, 'idref')); if (!item || !['application/xhtml+xml','text/html'].includes(item.type)) continue; const url = resource(base, item.href); sections.push({ id: id + '|' + url, title: 'Section ' + (sections.length + 1), position: sections.length }); }
       if (!sections.length) throw new Error('No readable spine sections; manifest items=' + items.size);
       const cover = abs(doc.querySelector('.book-cover a.gallery-item')?.attr('href') || summaries.get(id)?.cover || '');
-      const identityNote = opaqueTitle ? 'Reader identity uses the selected page file label (title and author); internal title is an opaque identifier.' : 'Reader package title verified.';
+      const identityNote = opaqueTitle || !epubAuthor ? 'Reader identity uses the selected page file label (title and author) where internal metadata is unavailable.' : 'Reader package title verified.';
       return { sections, summary: { id, title, author: author || epubAuthor || undefined, cover: cover || undefined, siteUrl: BASE + id, description: [doc.querySelector('.book-description .visible-text')?.text().trim(), identityNote].filter(Boolean).join('\n\n') } };
     } catch (e) { reasons.push(stage + ': ' + String(e) + '\nPackage: ' + root); }
   }
@@ -106,10 +108,10 @@ export const plugin: EBookProvider = {
   },
   async chapters(id: string) {
     if (id === 'fresh-catalogue-diagnostic') return [];
-    try { return (await load(id)).sections; } catch { return [{ id: DIAG + id, title: 'ReadAnyBook Fresh — reader diagnostic (not a book chapter)', position: 0 }]; }
+    try { return (await load(id)).sections; } catch { return [{ id: DIAG + id, title: 'ReadAnyBook Fresh — Author Fix diagnostic (not a book chapter)', position: 0 }]; }
   },
   async content(id: string) {
-    if (id.startsWith(DIAG)) { const bookId = id.slice(DIAG.length); if (path(BASE + bookId) !== bookId) throw new Error('Invalid diagnostic'); return 'ReadAnyBook Fresh reader diagnostic\n\nSource ID: readanybook-fresh\nThis is an error report, not book content.\n\n' + (failures.get(bookId) || 'Error expired; reopen the book to retry.'); }
+    if (id.startsWith(DIAG)) { const bookId = id.slice(DIAG.length); if (path(BASE + bookId) !== bookId) throw new Error('Invalid diagnostic'); return 'ReadAnyBook Fresh — Author Fix\n\nSource ID: readanybook-fresh\nThis is an error report, not book content.\n\n' + (failures.get(bookId) || 'Error expired; reopen the book to retry.'); }
     const split = id.indexOf('|'); if (split < 0) throw new Error('Invalid section');
     const book = await load(id.slice(0, split)); if (!book.sections.some(section => section.id === id)) throw new Error('Unknown section');
     const html = await get(id.slice(split + 1)); const body = /<body\b[^>]*>([\s\S]*?)<\/body>/i.exec(html)?.[1];
