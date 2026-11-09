@@ -3,10 +3,10 @@ import path from 'node:path';
 
 const DIST = path.join(process.cwd(), 'dist', 'manga');
 
-const ORDER = ['asura-seanime','legion-scans','weebcentral','kaynscan','projectsuki','mangadex','nhentai','mgeko','kingofshojo','manhuaplus','flamecomics','hivetoons','mangadistrict','manhwaclub','lilymanga','mangaworld','mangaworldadult','rawkuma','tcbscans','lnori','scythescans','reimanga','cocomic','manhwatoon','samuraiscan','mangaberri','mangacherri','chikari','rinkocomics','rokaricomics','scansgg','dankefurslesen','thunderscans','mangakatana','mangademon','vortexscans','hijala','manhwanex','atsumaru','batcave','mangapill'];
+const ORDER = ['asura-seanime','legion-scans','weebcentral','kaynscan','projectsuki','mangadex','nhentai','mgeko','kingofshojo','manhuaplus','flamecomics','hivetoons','mangadistrict','manhwaclub','lilymanga','mangaworld','mangaworldadult','rawkuma','tcbscans','lnori','scythescans','reimanga','cocomic','manhwatoon','samuraiscan','mangaberri','mangacherri','chikari','rinkocomics','rokaricomics','scansgg','dankefurslesen','thunderscans','mangakatana','mangademon','vortexscans','hijala','manhwanex','atsumaru'];
 const KEEP = new Set(ORDER);
 const EXTENDED = new Set<string>([]);
-const TESTING = new Set<string>(['probe-toocomic-reader4','probe-toocomic-reader3','probe-toocomic-reader2','probe-toocomic-reader1','probe-toocomic1','probe-sushiscan1','mangasushi','royalroad','readall-native2','toocomic-fr','punkrecords']);
+const TESTING = new Set<string>(['probe-toocomic-reader4','probe-toocomic-reader3','probe-toocomic-reader2','probe-toocomic-reader1','probe-toocomic1','probe-sushiscan1','mangasushi','royalroad','readall-native2','toocomic-fr','punkrecords','batcave','mangapill']);
 const TESTING_PREFIXES: string[] = [];
 const DEBUG_SKIP = new Set<string>(['probe-toocomic-reader4','probe-toocomic-reader3','probe-toocomic-reader2','probe-toocomic-reader1','probe-toocomic1','probe-sushiscan1','asura-seanime','mangasushi','batcave','royalroad','readall-native2','mangapill','atsumaru','toocomic-fr','punkrecords']);
 const DEBUG_SKIP_PREFIXES: string[] = [];
