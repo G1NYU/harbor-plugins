@@ -3,149 +3,16 @@ import path from 'node:path';
 
 const DIST = path.join(process.cwd(), 'dist', 'manga');
 
-// Display order in repo.json: pinned first, then approximate popularity.
-// Ids missing from this list are placed at the end.
-const ORDER = [
-  'asura-seanime',
-  'legion-scans',
-  'toocomic-fr',
-  'weebcentral',
-  'kaynscan',
-  'projectsuki',
-  'mangadex',
-  'nhentai',
-  'mgeko',
-  'kingofshojo',
-  'manhuaplus',
-  'flamecomics',
-  'hivetoons',
-  'mangadistrict',
-  'manhwaclub',
-  'lilymanga',
-  'mangaworld',
-  'mangaworldadult',
-  'rawkuma',
-  'tcbscans',
-  'lnori',
-  'scythescans',
-  'reimanga',
-  'cocomic',
-  'manhwatoon',
-  'samuraiscan',
-  'mangaberri',
-  'mangacherri',
-  'chikari',
-  'rinkocomics',
-  'rokaricomics',
-  'scansgg',
-  'dankefurslesen',
-  'punkrecords',
-  'thunderscans',
-  'mangakatana',
-  'mangademon',
-  'vortexscans',
-  'hijala',
-  'manhwanex',
-  'atsumaru',
-  'batcave',
-  'mangapill',
-];
-
-// Proven sources: shown in repo.json
-const KEEP = new Set([
-  'asura-seanime',
-  'legion-scans',
-  'toocomic-fr',
-  'flamecomics',
-  'hivetoons',
-  'weebcentral',
-  'mangadex',
-  'lilymanga',
-  'lnori',
-  'mangadistrict',
-  'mangaworld',
-  'mangaworldadult',
-  'manhuaplus',
-  'manhwaclub',
-  'mgeko',
-  'punkrecords',
-  'samuraiscan',
-  'chikari',
-  'cocomic',
-  'kingofshojo',
-  'mangaberri',
-  'mangacherri',
-  'reimanga',
-  'rinkocomics',
-  'rokaricomics',
-  'scansgg',
-  'dankefurslesen',
-  'kaynscan',
-  'manhwatoon',
-  'nhentai',
-  'projectsuki',
-  'rawkuma',
-  'scythescans',
-  'tcbscans',
-  'thunderscans',
-  'mangakatana',
-  'mangademon',
-  'vortexscans',
-  'hijala',
-  'manhwanex',
-  'atsumaru',
-  'batcave',
-  'mangapill',
-]);
-
-// Work, but with caveats (Cloudflare popup etc.): only shown in repo-extended.json
+const ORDER = ['asura-seanime','legion-scans','weebcentral','kaynscan','projectsuki','mangadex','nhentai','mgeko','kingofshojo','manhuaplus','flamecomics','hivetoons','mangadistrict','manhwaclub','lilymanga','mangaworld','mangaworldadult','rawkuma','tcbscans','lnori','scythescans','reimanga','cocomic','manhwatoon','samuraiscan','mangaberri','mangacherri','chikari','rinkocomics','rokaricomics','scansgg','dankefurslesen','thunderscans','mangakatana','mangademon','vortexscans','hijala','manhwanex','atsumaru','batcave','mangapill'];
+const KEEP = new Set(ORDER);
 const EXTENDED = new Set<string>([]);
-
-// Clean testing sources: shown in repo-testing.json without debug cards
-const TESTING = new Set<string>([
-  'probe-toocomic-reader4',
-  'probe-toocomic-reader3',
-  'probe-toocomic-reader2',
-  'probe-toocomic-reader1',
-  'probe-toocomic1',
-  'probe-sushiscan1',
-  'mangasushi',
-  'royalroad',
-  'readall-native2',
-]);
-
-// Diagnostic prefixes remain available but are excluded from this clean testing build.
+const TESTING = new Set<string>(['probe-toocomic-reader4','probe-toocomic-reader3','probe-toocomic-reader2','probe-toocomic-reader1','probe-toocomic1','probe-sushiscan1','mangasushi','royalroad','readall-native2','toocomic-fr','punkrecords']);
 const TESTING_PREFIXES: string[] = [];
-
-// No debug wrapper is applied in the clean testing build.
-const DEBUG_SKIP = new Set<string>([
-  'probe-toocomic-reader4',
-  'probe-toocomic-reader3',
-  'probe-toocomic-reader2',
-  'probe-toocomic-reader1',
-  'probe-toocomic1',
-  'probe-sushiscan1',
-  'asura-seanime',
-  'mangasushi',
-  'batcave',
-  'royalroad',
-  'readall-native2',
-  'mangapill',
-  'atsumaru',
-]);
+const DEBUG_SKIP = new Set<string>(['probe-toocomic-reader4','probe-toocomic-reader3','probe-toocomic-reader2','probe-toocomic-reader1','probe-toocomic1','probe-sushiscan1','asura-seanime','mangasushi','batcave','royalroad','readall-native2','mangapill','atsumaru','toocomic-fr','punkrecords']);
 const DEBUG_SKIP_PREFIXES: string[] = [];
-
-// Published sources whose bundles need the globalThis shim (they assign globalThis.App at load)
 const SHIM_PUBLISHED = new Set<string>(['thunderscans', 'mangakatana', 'mangademon', 'vortexscans', 'atsumaru']);
-
-// Atsumaru lists several cover variants. The small, medium and large ones are AVIF files that Harbor's covers do not show;
-// the plain image field is a JPEG. Reorder 'X.mediumImage ?? X.smallImage ?? X.image' so the JPEG comes first.
 const ATSUMARU_COVER_RE = /(\w+)(\??\.)mediumImage\?\?\1\2smallImage\?\?\1\2image/g;
 const ATSUMARU_COVER_REPLACE = '$1$2image??$1$2mediumImage??$1$2smallImage';
-
-// Compat shim: many upstream bundles run globalThis.App = ... (or this.App / self.App), but Harbor's runtime has no usable globalThis/self.
-// Run the bundle as a normal function bound to its own global-like object (reads fall through to the real global if present)
-// and keep App in sync with a bare App variable.
 const EXEC_FIND = 'const __executeUpstream = (Application) => {';
 const EXEC_REPLACE = [
   'const __realG = (typeof globalThis === "object" && globalThis) ? globalThis : null;',
@@ -158,7 +25,6 @@ const EXEC_REPLACE = [
 const CALL_FIND = 'const __sourceModule = __executeUpstream(Application);';
 const CALL_REPLACE = 'const __sourceModule = __executeUpstream.call(Object.create(__realG), Application);';
 
-// Load-time guard: if the bundle throws while loading in Harbor, register a plugin that shows the error and missing runtime features
 function loadGuardTail(id: string, name: string): string {
   return (
     '\n} catch (__e) {\n' +
@@ -181,7 +47,6 @@ function loadGuardTail(id: string, name: string): string {
 const repoPath = path.join(DIST, 'repo.json');
 const repo = JSON.parse(fs.readFileSync(repoPath, 'utf-8'));
 const all: any[] = repo.plugins ?? [];
-
 const idOf = (p: any) => String(p.id).toLowerCase();
 const startsWithAny = (id: string, prefixes: string[]) => prefixes.some((x) => id.startsWith(x));
 const inTesting = (p: any) => TESTING.has(idOf(p)) || startsWithAny(idOf(p), TESTING_PREFIXES);
@@ -190,25 +55,20 @@ const rank = (p: any) => {
   const i = ORDER.indexOf(idOf(p));
   return i < 0 ? ORDER.length : i;
 };
-
 const kept = all.filter((p) => KEEP.has(idOf(p))).sort((a, b) => rank(a) - rank(b));
 const extra = all.filter((p) => EXTENDED.has(idOf(p)));
 const testing = all.filter((p) => inTesting(p));
 const removed = all.filter((p) => !KEEP.has(idOf(p)) && !EXTENDED.has(idOf(p)) && !inTesting(p));
-
 for (const id of [...KEEP, ...EXTENDED, ...TESTING]) {
   if (!all.some((p) => idOf(p) === id)) {
     console.warn(`  Warning: allowlisted source '${id}' was not found in repo.json`);
   }
 }
-
 for (const p of removed) {
   if (!p.entry) continue;
   const f = path.join(DIST, p.entry);
   if (fs.existsSync(f)) fs.rmSync(f);
 }
-
-// Apply the globalThis shim (and source-specific fixes) to published bundles that need it
 for (const p of kept) {
   if (!SHIM_PUBLISHED.has(idOf(p)) || !p.entry) continue;
   const f = path.join(DIST, p.entry);
@@ -226,13 +86,10 @@ for (const p of kept) {
     const fixed = code.replace(ATSUMARU_COVER_RE, ATSUMARU_COVER_REPLACE);
     if (fixed === code) console.warn('  Warning: Atsumaru cover pattern not found; covers unchanged');
     code = fixed;
-    // New version string so Harbor does not keep serving a cached copy (semver: alpha.25.1 > alpha.25)
     p.version = `${p.version}.1`;
   }
   if (code !== original) fs.writeFileSync(f, code, 'utf-8');
 }
-
-// Clean testing build: apply only the compatibility shim and load guard; no debug cards, cover URL rows, or request logs.
 for (const p of testing) {
   if (skipsDebug(p) || !p.entry) continue;
   const f = path.join(DIST, p.entry);
@@ -249,7 +106,6 @@ for (const p of testing) {
   p.version = `${p.version}-clean.1`;
   p.name = `${p.name} [clean]`;
 }
-
 if (testing.length > 0) {
   const testingRepo = {
     ...repo,
@@ -259,7 +115,6 @@ if (testing.length > 0) {
   };
   fs.writeFileSync(path.join(DIST, 'repo-testing.json'), JSON.stringify(testingRepo, null, 2), 'utf-8');
 }
-
 const extendedRepo = {
   ...repo,
   name: `${repo.name} (Extended)`,
@@ -267,11 +122,8 @@ const extendedRepo = {
   plugins: [...kept, ...extra],
 };
 fs.writeFileSync(path.join(DIST, 'repo-extended.json'), JSON.stringify(extendedRepo, null, 2), 'utf-8');
-
 repo.plugins = kept;
 fs.writeFileSync(repoPath, JSON.stringify(repo, null, 2), 'utf-8');
-
-// Only report fallbacks for sources that are actually published.
 const reportPath = path.join(DIST, 'sync-report.json');
 if (fs.existsSync(reportPath)) {
   try {
@@ -281,5 +133,4 @@ if (fs.existsSync(reportPath)) {
     fs.writeFileSync(reportPath, JSON.stringify(report, null, 2), 'utf-8');
   } catch (_) {}
 }
-
 console.log(`Pruned manga repo: kept ${kept.length}, extended +${extra.length}, testing ${testing.length}, removed ${removed.length}`);
