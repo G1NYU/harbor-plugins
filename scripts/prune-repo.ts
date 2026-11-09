@@ -47,6 +47,8 @@ const ORDER = [
   'hijala',
   'manhwanex',
   'atsumaru',
+  'batcave',
+  'mangapill',
 ];
 
 // Proven sources: shown in repo.json
@@ -92,6 +94,8 @@ const KEEP = new Set([
   'hijala',
   'manhwanex',
   'atsumaru',
+  'batcave',
+  'mangapill',
 ]);
 
 // Work, but with caveats (Cloudflare popup etc.): only shown in repo-extended.json
@@ -106,11 +110,8 @@ const TESTING = new Set<string>([
   'probe-toocomic1',
   'probe-sushiscan1',
   'mangasushi',
-  'batcave',
   'royalroad',
   'readall-native2',
-  'mangapill',
-  'atsumaru',
 ]);
 
 // Diagnostic prefixes remain available but are excluded from this clean testing build.
