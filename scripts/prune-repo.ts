@@ -44,6 +44,9 @@ function loadGuardTail(id: string, name: string): string {
   );
 }
 
+TESTING.add('probe-batcave1');
+DEBUG_SKIP.add('probe-batcave1');
+
 const repoPath = path.join(DIST, 'repo.json');
 const repo = JSON.parse(fs.readFileSync(repoPath, 'utf-8'));
 const all: any[] = repo.plugins ?? [];
