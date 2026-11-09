@@ -1,10 +1,1 @@
-{
-  "id": "standardebooks",
-  "name": "Standard Ebooks",
-  "version": "0.1.7",
-  "lang": "en",
-  "nsfw": false,
-  "entry": "standardebooks.plugin.js",
-  "description": "Read public-domain eBooks from Standard Ebooks.",
-  "website": "https://standardebooks.org/"
-}
+{"id":"standardebooks","name":"Standard Ebooks","version":"0.1.8","lang":"en","nsfw":false,"entry":"standardebooks.plugin.js","description":"Read public-domain eBooks from Standard Ebooks.","website":"https://standardebooks.org/"}
