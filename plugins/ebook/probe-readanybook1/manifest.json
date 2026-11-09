@@ -1,0 +1,1 @@
+{"id":"probe-readanybook1","name":"ReadAnyBook Test v1","version":"0.0.1","lang":"en","nsfw":false,"entry":"probe-readanybook1.plugin.js","description":"Diagnostic only: checks one supplied EPUB manifest and one text section. Not a working catalogue.","website":"https://www.readanybook.com/"}
