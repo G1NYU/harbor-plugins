@@ -1,0 +1,1 @@
+{"id":"probe-readanybook-reader1","name":"ReadAnyBook Reader Test v1","version":"0.0.1","lang":"en","nsfw":false,"entry":"probe-readanybook-reader1.plugin.js","description":"One-book reading test, not a full catalogue. Uses EPUB spine order.","website":"https://www.readanybook.com/"}
