@@ -1,6 +1,6 @@
 import type { EBookProvider, EBookSummary, EBookChapter } from '../../../shared/types/ebook.js';
 const BASE = 'https://www.readanybook.com';
-const DIAG = 'readanybook-fresh-labels-diagnostic|';
+const DIAG = 'readanybook-fresh-recovery-diagnostic|';
 function abs(s: string): string { s = String(s || '').replace(/&amp;/g, '&').trim(); return s.startsWith('//') ? 'https:' + s : s.startsWith('/') ? BASE + s : /^https?:\/\//i.test(s) ? s.replace(/^http:/i, 'https:') : ''; }
 function path(s: string): string { return /^https:\/\/(?:www\.)?readanybook\.com(\/ebook\/[a-z0-9-]+-\d+)\/?(?:[?#].*)?$/i.exec(abs(s))?.[1] || ''; }
 function attr(tag: string, key: string): string { return new RegExp('(?:^|\\s)' + key + '\\s*=\\s*["\x27]([^"\x27]*)["\x27]', 'i').exec(tag)?.[1].replace(/&amp;/g, '&') || ''; }
@@ -79,7 +79,16 @@ async function labelSections(sections: EBookChapter[], base: string, xml: string
       } catch {}
     }
   }));
-  for (const section of sections) section.title = names.get(sectionUrl(section)) || 'Untitled section ' + ((section.position || 0) + 1);
+  const totals = new Map<string, number>();
+  for (const section of sections) {
+    section.title = names.get(sectionUrl(section)) || 'Untitled section ' + ((section.position || 0) + 1);
+    const key = section.title.toLowerCase(); totals.set(key, (totals.get(key) || 0) + 1);
+  }
+  for (const section of sections) {
+    const key = (section.title || '').toLowerCase();
+    if ((totals.get(key) || 0) > 1) section.title += ' (source section ' + ((section.position || 0) + 1) + ')';
+    else if (sections.length === 1 && /^(start|begin|beginning)$/i.test(section.title || '')) section.title += ' — single source section';
+  }
 }
 const summaries = new Map<string, EBookSummary>();
 let report = '';
@@ -88,14 +97,16 @@ async function browse(q: string, offset: number): Promise<EBookSummary[]> {
   try {
     const doc = await harbor.parseHtml(await get(BASE + (q ? '/search?q=' + encodeURIComponent(q) : '/')));
     const out = new Map<string, EBookSummary>();
-    for (const card of doc.querySelectorAll('.book-preview')) {
+    const container = q ? '.search-books:not(.ext-net)' : '.main-list';
+    if (!doc.querySelector(container)) throw new Error('Expected catalogue container not found: ' + container);
+    for (const card of doc.querySelectorAll(container + ' .book-preview')) {
       const a = card.querySelector('.preview-name a'); const id = path(a?.attr('href') || ''); const title = a?.text().trim();
       if (!id || !title) continue;
       const img = card.querySelector('img');
       const book = { id, title, author: card.querySelector('.preview-author .list')?.text().trim(), cover: abs(img?.attr('data-src') || img?.attr('src') || '') || undefined, siteUrl: BASE + id };
       out.set(id, book); summaries.set(id, book);
     }
-    if (!out.size) throw new Error('No book cards found');
+    if (!q && !out.size) throw new Error('No book cards found in main catalogue');
     return Array.from(out.values());
   } catch (e) { report = String(e); return [{ id: 'fresh-catalogue-diagnostic', title: 'ReadAnyBook Fresh Diagnostic', description: report }]; }
 }
@@ -136,9 +147,10 @@ async function discover(id: string): Promise<Loaded> {
       stage = 'identity';
       const opaqueTitle = /^[a-f0-9]{32}(?:[a-f0-9]{8}|[a-f0-9]{32})?$/i.test(epubTitle);
       const labelVerified = (labels.get(root) || []).some(label => containsAll(title, label) && containsAll(author, label));
-      if (!matches(title, epubTitle) && !(opaqueTitle && labelVerified)) throw new Error('Title mismatch: expected ' + title + '; found ' + (epubTitle || '[missing]') + '; package author=' + (rawAuthor || '[missing]') + '; strict file-label match=' + labelVerified);
-      if (!epubAuthor && !labelVerified) throw new Error('Missing author metadata requires full title and author in the selected file label; package author=' + (rawAuthor || '[missing]'));
-      if ((tokens(title).length === 1 && tokens(title)[0].length <= 2) && (!author || !epubAuthor)) throw new Error('Short title requires author metadata');
+      const shortTitle = tokens(title).length === 1 && tokens(title)[0].length <= 2;
+      const titleVerified = !opaqueTitle && matches(title, epubTitle) && (shortTitle || containsAll(title, epubTitle));
+      if (!titleVerified && !(opaqueTitle && labelVerified)) throw new Error('Title mismatch: expected ' + title + '; found ' + (epubTitle || '[missing]') + '; package author=' + (rawAuthor || '[missing]') + '; strict file-label match=' + labelVerified);
+      if (shortTitle && (!author || !epubAuthor)) throw new Error('Short title requires author metadata');
       if (author && epubAuthor && !tokens(author).some(t => tokens(epubAuthor).includes(t))) throw new Error('Author mismatch: expected ' + author + '; found ' + epubAuthor);
       stage = 'spine';
       const base = opfUrl.slice(0, opfUrl.lastIndexOf('/') + 1);
@@ -152,8 +164,8 @@ async function discover(id: string): Promise<Loaded> {
       if (!sections.length) throw new Error('No readable spine sections; manifest items=' + items.size);
       try { await labelSections(sections, base, xml, items, spineMatch?.[0] || ''); } catch {}
       const cover = abs(doc.querySelector('.book-cover a.gallery-item')?.attr('href') || summaries.get(id)?.cover || '');
-      const identityNote = opaqueTitle || !epubAuthor ? 'Reader identity uses the selected page file label (title and author) where internal metadata is unavailable.' : 'Reader package title verified.';
-      return { sections, summary: { id, title, author: author || epubAuthor || undefined, cover: cover || undefined, siteUrl: BASE + id, description: [doc.querySelector('.book-description .visible-text')?.text().trim(), identityNote, 'Chapter Labels: all reading-order sections are retained; names come from navigation, NCX, guide metadata or a bounded heading fallback. Multiple TOC links within one document remain one section.'].filter(Boolean).join('\n\n') } };
+      const identityNote = opaqueTitle ? 'Reader identity uses the selected page file label (title and author) because the internal title is opaque.' : 'Reader package title verified; meaningful author metadata is checked when available.';
+      return { sections, summary: { id, title, author: author || epubAuthor || undefined, cover: cover || undefined, siteUrl: BASE + id, description: [doc.querySelector('.book-description .visible-text')?.text().trim(), identityNote, 'Reader Recovery: all source sections are retained in reading order. Repeated labels identify source sections, not duplicate content. Multiple TOC links within one document remain one section.'].filter(Boolean).join('\n\n') } };
     } catch (e) { reasons.push(stage + ': ' + String(e) + '\nPackage: ' + root); }
   }
   throw new Error(reasons.join('\n\n'));
@@ -168,10 +180,10 @@ export const plugin: EBookProvider = {
   },
   async chapters(id: string) {
     if (id === 'fresh-catalogue-diagnostic') return [];
-    try { return (await load(id)).sections; } catch { return [{ id: DIAG + id, title: 'ReadAnyBook Fresh — Chapter Labels diagnostic (not a book chapter)', position: 0 }]; }
+    try { return (await load(id)).sections; } catch { return [{ id: DIAG + id, title: 'ReadAnyBook Fresh — Reader Recovery diagnostic (not a book chapter)', position: 0 }]; }
   },
   async content(id: string) {
-    if (id.startsWith(DIAG)) { const bookId = id.slice(DIAG.length); if (path(BASE + bookId) !== bookId) throw new Error('Invalid diagnostic'); return 'ReadAnyBook Fresh — Chapter Labels\n\nSource ID: readanybook-fresh\nThis is an error report, not book content.\n\n' + (failures.get(bookId) || 'Error expired; reopen the book to retry.'); }
+    if (id.startsWith(DIAG)) { const bookId = id.slice(DIAG.length); if (path(BASE + bookId) !== bookId) throw new Error('Invalid diagnostic'); return 'ReadAnyBook Fresh — Reader Recovery\n\nSource ID: readanybook-fresh\nThis is an error report, not book content.\n\n' + (failures.get(bookId) || 'Error expired; reopen the book to retry.'); }
     const split = id.indexOf('|'); if (split < 0) throw new Error('Invalid section');
     const book = await load(id.slice(0, split)); if (!book.sections.some(section => section.id === id)) throw new Error('Unknown section');
     const html = await get(id.slice(split + 1)); const body = /<body\b[^>]*>([\s\S]*?)<\/body>/i.exec(html)?.[1];
