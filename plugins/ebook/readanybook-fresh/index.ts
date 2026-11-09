@@ -1,9 +1,9 @@
 import type { EBookProvider, EBookSummary, EBookChapter } from '../../../shared/types/ebook.js';
 const BASE = 'https://www.readanybook.com';
-const DIAG = 'readanybook-fresh-authorfix-diagnostic|';
+const DIAG = 'readanybook-fresh-labels-diagnostic|';
 function abs(s: string): string { s = String(s || '').replace(/&amp;/g, '&').trim(); return s.startsWith('//') ? 'https:' + s : s.startsWith('/') ? BASE + s : /^https?:\/\//i.test(s) ? s.replace(/^http:/i, 'https:') : ''; }
 function path(s: string): string { return /^https:\/\/(?:www\.)?readanybook\.com(\/ebook\/[a-z0-9-]+-\d+)\/?(?:[?#].*)?$/i.exec(abs(s))?.[1] || ''; }
-function attr(tag: string, key: string): string { return new RegExp('\\b' + key + '\\s*=\\s*["\x27]([^"\x27]*)["\x27]', 'i').exec(tag)?.[1].replace(/&amp;/g, '&') || ''; }
+function attr(tag: string, key: string): string { return new RegExp('(?:^|\\s)' + key + '\\s*=\\s*["\x27]([^"\x27]*)["\x27]', 'i').exec(tag)?.[1].replace(/&amp;/g, '&') || ''; }
 function value(xml: string, key: string): string { return (new RegExp('<dc:' + key + '\\b[^>]*>([\\s\\S]*?)<\\/dc:' + key + '>', 'i').exec(xml)?.[1] || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&apos;/g, "'").replace(/&quot;/g, '"').trim(); }
 function tokens(s: string): string[] { return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/['’]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').split(' ').filter(t => t.length > 1 && !['the','and','of','book','one','two','three','epub','online'].includes(t)); }
 function matches(title: string, other: string): boolean { const wanted = Array.from(new Set(tokens(title))); const actual = new Set(tokens(other)); return wanted.length > 0 && wanted.filter(t => actual.has(t)).length / wanted.length >= 0.75; }
@@ -23,6 +23,64 @@ function resource(base: string, relative: string): string {
   return root + parts.join('/');
 }
 async function get(url: string): Promise<string> { const r = await harbor.http(url, { responseType: 'text', timeoutMs: 15000 }); if (r.status !== 200) throw new Error('HTTP ' + r.status + ' at ' + url); return String(r.body || ''); }
+type Item = { href: string; type: string; properties: string };
+async function labelSections(sections: EBookChapter[], base: string, xml: string, items: Map<string, Item>, spine: string): Promise<void> {
+  const names = new Map<string, string>();
+  const sectionUrl = (s: EBookChapter) => s.id.slice(s.id.indexOf('|') + 1);
+  const allowed = new Set(sections.map(sectionUrl));
+  const clean = (s: string) => s.replace(/\s+/g, ' ').trim().slice(0, 240);
+  function add(dir: string, href: string, title: string) {
+    try { const url = resource(dir, href); const name = clean(title); if (name && allowed.has(url) && !names.has(url)) names.set(url, name); } catch {}
+  }
+  const nav = Array.from(items.values()).find(item => item.properties.split(/\s+/).includes('nav'));
+  if (nav) {
+    try {
+      const url = resource(base, nav.href); const dir = url.slice(0, url.lastIndexOf('/') + 1);
+      const doc = await harbor.parseHtml(await get(url));
+      const toc = doc.querySelectorAll('nav').find(node => (node.attr('epub:type') || '').split(/\s+/).includes('toc') || node.attr('role') === 'doc-toc');
+      for (const link of toc?.querySelectorAll('a[href]') || []) add(dir, link.attr('href') || '', link.text());
+    } catch {}
+  }
+  if (names.size < sections.length) {
+    const ncxId = attr((spine.match(/<spine\b[^>]*>/i) || [])[0] || '', 'toc');
+    const ncx = items.get(ncxId) || Array.from(items.values()).find(item => item.type === 'application/x-dtbncx+xml');
+    if (ncx) {
+      try {
+        const url = resource(base, ncx.href); const dir = url.slice(0, url.lastIndexOf('/') + 1); const source = await get(url);
+        const stack: Array<{ name: string; href: string }> = [];
+        for (const token of source.match(/<navPoint\b[^>]*>|<\/navPoint\s*>|<navLabel\b[^>]*>[\s\S]*?<\/navLabel\s*>|<content\b[^>]*>/gi) || []) {
+          if (/^<navPoint\b/i.test(token)) stack.push({ name: '', href: '' });
+          else if (/^<\/navPoint/i.test(token)) stack.pop();
+          else if (stack.length) {
+            const entry = stack[stack.length - 1];
+            if (/^<navLabel\b/i.test(token)) entry.name = (await harbor.parseHtml('<html><body><p>' + token.replace(/<[^>]*>/g, '') + '</p></body></html>')).querySelector('p')?.text() || '';
+            else { entry.href = attr(token, 'src'); add(dir, entry.href, entry.name); }
+          }
+        }
+      } catch {}
+    }
+  }
+  const guide = /<guide\b[^>]*>([\s\S]*?)<\/guide>/i.exec(xml)?.[1] || '';
+  const standard: Record<string, string> = { cover: 'Cover', 'title-page': 'Title page', copyright: 'Copyright', dedication: 'Dedication', preface: 'Preface', foreword: 'Foreword', acknowledgements: 'Acknowledgements', toc: 'Contents', 'list-of-illustrations': 'List of illustrations', 'list-of-tables': 'List of tables', glossary: 'Glossary', bibliography: 'Bibliography', index: 'Index' };
+  for (const tag of guide.match(/<reference\b[^>]*>/gi) || []) {
+    try { const type = attr(tag, 'type').toLowerCase(); const title = attr(tag, 'title'); const decoded = title ? (await harbor.parseHtml('<p>' + title.replace(/</g, '&lt;') + '</p>')).querySelector('p')?.text() || '' : ''; add(base, attr(tag, 'href'), decoded || standard[type] || ''); } catch {}
+  }
+  const missing = sections.filter(section => !names.has(sectionUrl(section))).slice(0, 12);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(3, missing.length) }, async () => {
+    while (next < missing.length) {
+      const section = missing[next++]; const url = sectionUrl(section);
+      try {
+        const source = await get(url); const body = /<body\b[^>]*>([\s\S]*?)<\/body>/i.exec(source)?.[1];
+        if (body === undefined) continue;
+        const doc = await harbor.parseHtml('<html><body>' + body + '</body></html>');
+        const heading = doc.querySelector('body h1, body h2, body h3, body h4, body h5, body h6')?.text();
+        if (heading && clean(heading)) names.set(url, clean(heading));
+      } catch {}
+    }
+  }));
+  for (const section of sections) section.title = names.get(sectionUrl(section)) || 'Untitled section ' + ((section.position || 0) + 1);
+}
 const summaries = new Map<string, EBookSummary>();
 let report = '';
 async function browse(q: string, offset: number): Promise<EBookSummary[]> {
@@ -85,15 +143,17 @@ async function discover(id: string): Promise<Loaded> {
       stage = 'spine';
       const base = opfUrl.slice(0, opfUrl.lastIndexOf('/') + 1);
       const manifest = /<manifest\b[^>]*>([\s\S]*?)<\/manifest>/i.exec(xml)?.[1] || '';
-      const spine = /<spine\b[^>]*>([\s\S]*?)<\/spine>/i.exec(xml)?.[1] || '';
-      const items = new Map<string, { href: string; type: string }>();
-      for (const tag of manifest.match(/<item\b[^>]*>/gi) || []) items.set(attr(tag, 'id'), { href: attr(tag, 'href'), type: attr(tag, 'media-type') });
+      const spineMatch = /<spine\b[^>]*>([\s\S]*?)<\/spine>/i.exec(xml);
+      const spine = spineMatch?.[1] || '';
+      const items = new Map<string, Item>();
+      for (const tag of manifest.match(/<item\b[^>]*>/gi) || []) items.set(attr(tag, 'id'), { href: attr(tag, 'href'), type: attr(tag, 'media-type'), properties: attr(tag, 'properties') });
       const sections: EBookChapter[] = [];
-      for (const tag of spine.match(/<itemref\b[^>]*>/gi) || []) { const item = items.get(attr(tag, 'idref')); if (!item || !['application/xhtml+xml','text/html'].includes(item.type)) continue; const url = resource(base, item.href); sections.push({ id: id + '|' + url, title: 'Section ' + (sections.length + 1), position: sections.length }); }
+      for (const tag of spine.match(/<itemref\b[^>]*>/gi) || []) { const item = items.get(attr(tag, 'idref')); if (!item || !['application/xhtml+xml','text/html'].includes(item.type)) continue; const url = resource(base, item.href); sections.push({ id: id + '|' + url, title: 'Untitled section ' + (sections.length + 1), position: sections.length }); }
       if (!sections.length) throw new Error('No readable spine sections; manifest items=' + items.size);
+      try { await labelSections(sections, base, xml, items, spineMatch?.[0] || ''); } catch {}
       const cover = abs(doc.querySelector('.book-cover a.gallery-item')?.attr('href') || summaries.get(id)?.cover || '');
       const identityNote = opaqueTitle || !epubAuthor ? 'Reader identity uses the selected page file label (title and author) where internal metadata is unavailable.' : 'Reader package title verified.';
-      return { sections, summary: { id, title, author: author || epubAuthor || undefined, cover: cover || undefined, siteUrl: BASE + id, description: [doc.querySelector('.book-description .visible-text')?.text().trim(), identityNote].filter(Boolean).join('\n\n') } };
+      return { sections, summary: { id, title, author: author || epubAuthor || undefined, cover: cover || undefined, siteUrl: BASE + id, description: [doc.querySelector('.book-description .visible-text')?.text().trim(), identityNote, 'Chapter Labels: all reading-order sections are retained; names come from navigation, NCX, guide metadata or a bounded heading fallback. Multiple TOC links within one document remain one section.'].filter(Boolean).join('\n\n') } };
     } catch (e) { reasons.push(stage + ': ' + String(e) + '\nPackage: ' + root); }
   }
   throw new Error(reasons.join('\n\n'));
@@ -108,10 +168,10 @@ export const plugin: EBookProvider = {
   },
   async chapters(id: string) {
     if (id === 'fresh-catalogue-diagnostic') return [];
-    try { return (await load(id)).sections; } catch { return [{ id: DIAG + id, title: 'ReadAnyBook Fresh — Author Fix diagnostic (not a book chapter)', position: 0 }]; }
+    try { return (await load(id)).sections; } catch { return [{ id: DIAG + id, title: 'ReadAnyBook Fresh — Chapter Labels diagnostic (not a book chapter)', position: 0 }]; }
   },
   async content(id: string) {
-    if (id.startsWith(DIAG)) { const bookId = id.slice(DIAG.length); if (path(BASE + bookId) !== bookId) throw new Error('Invalid diagnostic'); return 'ReadAnyBook Fresh — Author Fix\n\nSource ID: readanybook-fresh\nThis is an error report, not book content.\n\n' + (failures.get(bookId) || 'Error expired; reopen the book to retry.'); }
+    if (id.startsWith(DIAG)) { const bookId = id.slice(DIAG.length); if (path(BASE + bookId) !== bookId) throw new Error('Invalid diagnostic'); return 'ReadAnyBook Fresh — Chapter Labels\n\nSource ID: readanybook-fresh\nThis is an error report, not book content.\n\n' + (failures.get(bookId) || 'Error expired; reopen the book to retry.'); }
     const split = id.indexOf('|'); if (split < 0) throw new Error('Invalid section');
     const book = await load(id.slice(0, split)); if (!book.sections.some(section => section.id === id)) throw new Error('Unknown section');
     const html = await get(id.slice(split + 1)); const body = /<body\b[^>]*>([\s\S]*?)<\/body>/i.exec(html)?.[1];
