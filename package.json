@@ -5,9 +5,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "build": "tsx scripts/build.ts && tsx scripts/convert-paperback.ts && tsx scripts/prune-repo.ts",
+    "build": "tsx scripts/build.ts && tsx scripts/convert-paperback.ts && tsx scripts/prune-repo.ts && tsx scripts/release-ebooks.ts",
     "convert": "tsx scripts/convert-paperback.ts",
-    "sync-upstream": "tsx scripts/build.ts && tsx scripts/convert-paperback.ts && tsx scripts/validate.ts",
+    "sync-upstream": "tsx scripts/build.ts && tsx scripts/convert-paperback.ts && tsx scripts/release-ebooks.ts && tsx scripts/validate.ts",
     "gate": "tsx scripts/update-gate.ts",
     "trial-report": "tsx scripts/trial-report.ts",
     "validate": "tsx scripts/validate.ts",
