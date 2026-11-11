@@ -1,0 +1,10 @@
+{
+  "id": "ocecomic-com",
+  "name": "OceComic [TEST]",
+  "version": "0.1.0",
+  "lang": "en",
+  "nsfw": false,
+  "entry": "ocecomic-com.plugin.js",
+  "description": "Experimental western-comics source. Battleworld Issue #1 sample has 28 direct reader images; live Harbor tests pending.",
+  "website": "https://ocecomic.com/"
+}
