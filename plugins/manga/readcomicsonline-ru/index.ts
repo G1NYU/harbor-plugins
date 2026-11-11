@@ -118,54 +118,84 @@ function parseCatalogue(html: string): MangaSummary[] {
 }
 function parseIssues(html: string, slug: string): MangaChapter[] {
   const unique = new Map<string, MangaChapter>();
-  function add(url: string, label: string) {
+  // Issue IDs, not surrounding link text, determine the displayed issue number.
+  // The detail page includes links like "Read First" whose text is not a title.
+  function add(url: string) {
     const found = issuePath(url);
-    if (!found || found.slug !== slug || unique.has(found.issue)) return;
-    const match = /^(?:chapter|issue|ch\.?|#)\s*#?\s*(.*)$/i.exec(stripTags(label));
+    if (!found || found.slug !== slug || !/^\d+(?:\.\d+)?$/.test(found.issue)
+      || unique.has(found.issue)) return;
     const issue = found.issue;
-    const numeric = /^\d+(?:\.\d+)?$/.test(issue) ? issue : null;
-    const suffix = stripTags(match ? match[1] : label);
     unique.set(issue, {
       id: slug + '/' + issue,
-      chapter: numeric,
-      title: suffix ? (numeric ? 'Issue #' + suffix : suffix) : 'Issue #' + issue,
+      chapter: issue,
+      title: 'Issue #' + issue,
       pages: 0,
       language: 'en',
     });
   }
-  const optionPattern = /<option\b[^>]*>([\s\S]*?)<\/option>/gi;
-  for (const m of html.matchAll(optionPattern)) {
-    const open = /^<option\b[^>]*>/i.exec(m[0])?.[0] || '';
-    add(attribute(open, 'value'), m[1]);
+
+  // The real reader exposes issue selection through .js-chapter-select.
+  // Options are authoritative; scan other issue links only as a fallback for
+  // series-detail templates with no selector.
+  const chapterSelect = /<select\b[^>]*\bclass\s*=\s*["'][^"']*js-chapter-select[^"']*["'][^>]*>([\s\S]*?)<\/select>/gi;
+  for (const select of html.matchAll(chapterSelect)) {
+    for (const option of select[1].matchAll(/<option\b[^>]*>/gi)) {
+      add(attribute(option[0], 'value'));
+    }
   }
-  const anchorPattern = /<a\b[^>]*>([\s\S]*?)<\/a>/gi;
-  for (const m of html.matchAll(anchorPattern)) {
-    const open = /^<a\b[^>]*>/i.exec(m[0])?.[0] || '';
-    add(attribute(open, 'href'), m[1]);
+  if (unique.size === 0) {
+    for (const anchor of html.matchAll(/<a\b[^>]*>/gi)) {
+      add(attribute(anchor[0], 'href'));
+    }
   }
   return [...unique.values()].sort((a, b) =>
     Number(b.chapter || 0) - Number(a.chapter || 0) || b.id.localeCompare(a.id));
 }
-function parsePages(html: string, slug: string, issue: string): string[] {
-  const reader = /<div\b[^>]*\bid\s*=\s*["']reader-all["'][^>]*>([\s\S]*?)<\/div>/i.exec(html)?.[1] || '';
-  let body = reader;
-  if (!body) {
-    // The normal reader has an individual #reader-img and, separately, the
-    // complete issue at #reader-all. Only use image fallbacks for the *same*
-    // issue, not the cover, ads, or next-issue navigation.
-    body = html;
+function readerSection(html: string): string {
+  const root = /<div\b[^>]*\bid\s*=\s*["']reader-all["'][^>]*>/i.exec(html);
+  if (!root) return '';
+  const begin = root.index + root[0].length;
+  const tags = /<\/?div\b[^>]*>/gi;
+  tags.lastIndex = begin;
+  let depth = 1;
+  let match: RegExpExecArray | null;
+  while ((match = tags.exec(html))) {
+    if (/^<\/div/i.test(match[0])) depth--;
+    else depth++;
+    if (depth === 0) return html.slice(begin, match.index);
   }
+  return html.slice(begin);
+}
+function parsePages(html: string, slug: string, issue: string): string[] {
+  const section = readerSection(html);
+  // The issue-specific #reader-all HTML is authoritative. If absent, accept
+  // only images under the exact requested issue directory as a fallback.
+  const body = section || html;
+  const prefix = '/uploads/manga/' + slug + '/chapters/';
   const out: string[] = [];
-  const pathPrefix = '/uploads/manga/' + slug + '/chapters/' + issue + '/';
   const seen = new Set<string>();
   for (const match of body.matchAll(/<img\b[^>]*>/gi)) {
-    const link = imageUrl(match[0]);
-    if (!link) continue;
-    let parsed: URL;
-    try { parsed = new URL(link); } catch { continue; }
-    if (!parsed.pathname.includes(pathPrefix) || seen.has(link)) continue;
-    seen.add(link);
-    out.push(link);
+    const tag = match[0];
+    const srcset = attribute(tag, 'srcset') || attribute(tag, 'data-srcset');
+    const candidates = [
+      attribute(tag, 'data-src'), attribute(tag, 'data-original'),
+      attribute(tag, 'data-lazy-src'), attribute(tag, 'src'),
+      srcset ? srcset.split(',')[0].trim().split(/\s+/)[0] : '',
+    ];
+    let image: string | undefined;
+    for (const candidate of candidates) {
+      const url = urlOf(candidate);
+      if (!url) continue;
+      const parsed = new URL(url);
+      const path = parsed.pathname;
+      if (!path.startsWith(prefix) || !/\.(?:webp|png|jpe?g|avif)$/i.test(path)) continue;
+      if (!section && !path.startsWith(prefix + issue + '/')) continue;
+      image = url;
+      break;
+    }
+    if (!image || seen.has(image)) continue;
+    seen.add(image);
+    out.push(image);
   }
   return out;
 }
@@ -252,7 +282,14 @@ const plugin: MangaProvider = {
       html = await getHtml('/comic/' + slug + '/' + issue + '/1');
       pages = parsePages(html, slug, issue);
     }
-    if (!pages.length) throw new Error('No issue pages found in #reader-all for ' + chapterId);
+    if (!pages.length) {
+      const sectionPresent = /\bid\s*=\s*["']reader-all["']/i.test(html);
+      const imageTags = (html.match(/<img\b/gi) || []).length;
+      throw new Error('Issue #' + issue + ' has no usable comic pages (' +
+        (sectionPresent ? 'reader present' : 'no full-page reader') +
+        ', HTML images: ' + imageTags +
+        '). The issue may be missing images or using a different CDN layout.');
+    }
     const expected = /Page\s+\d+\s*\/\s*(\d+)/i.exec(html)?.[1];
     if (expected && Number(expected) > pages.length) {
       throw new Error('Partial reader result: ' + pages.length + ' of ' + expected + ' pages for ' + chapterId);
