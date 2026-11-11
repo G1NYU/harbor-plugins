@@ -316,7 +316,6 @@ const plugin: MangaProvider = {
     }
     throw new Error('Issue #' + issue + ' could not load (' + lastProblem +
       '). Check whether the original website loads this issue reliably.');
-  }
   },
 };
 
