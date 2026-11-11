@@ -1,10 +1,10 @@
 {
   "id": "toocomic-fr",
   "name": "🇫🇷 TooComic FR",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "lang": "fr",
   "nsfw": false,
   "entry": "toocomic-fr.plugin.js",
-  "description": "French manga and manhwa from TooComic. Long-series chapter discovery and early chapter images verified in Harbor across multiple series.",
+  "description": "French manga/manhwa. Updated MangaVerse catalogue links, CSS covers, search and paginated browse; retains previously verified chapter reader and long-history support.",
   "website": "https://www.toocomic.com/fr/"
 }

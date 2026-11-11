@@ -105,30 +105,48 @@ function firstImage(fragment: string): string | undefined {
   return undefined;
 }
 
-// The homepage is an unverified feed; prefer obvious linked card markup and
-// fall back to chapter links to identify their parent series (not inventions).
+// MangaVerse now lists its FR series as /fr/manga/<slug>.html,
+// while the same series' reader/archive lives at /fr/<slug>/.
+// Keep our canonical series IDs unchanged so Harbor library/reading progress
+// and previously verified chapter links continue to resolve.
+function listingSeriesPath(raw: string): string {
+  const path = localPath(raw);
+  const category = /^\/fr\/manga\/([^/?#]+)\.html\/?(?:\?.*)?$/i.exec(path);
+  if (category) return '/fr/' + category[1] + '/';
+  return isSeries(path) ? withoutQuery(path).replace(/\/?$/, '/') : '';
+}
+function cssCover(fragment: string): string | undefined {
+  for (const tag of fragment.match(/<div\b[^>]*>/gi) || []) {
+    if (!attr(tag, 'class').split(/\s+/).includes('series-card-thumb')) continue;
+    const style = attr(tag, 'style');
+    const raw = /background(?:-image)?\s*:\s*url\(\s*(['"]?)(.*?)\1\s*\)/i.exec(style)?.[2];
+    if (!raw) continue;
+    const resolved = abs(raw);
+    if (/^https:\/\/(?:www\.)?toocomic\.com\/wp-content\/uploads\/[^?#]+\.(?:jpe?g|png|webp|avif)$/i.test(resolved)) {
+      return resolved;
+    }
+  }
+  return undefined;
+}
 function seriesList(html: string, query = ''): MangaSummary[] {
   const results: MangaSummary[] = [];
   const seen: Record<string, boolean> = {};
-  const q = query.trim().toLowerCase();
-  const anchor = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
+  const q = query.trim().toLocaleLowerCase('fr');
+  // Only real .series-card-link tiles, not menus, featured "Read Now" links
+  // or individual chapter links. The thumbnail is a CSS background, not <img>.
+  const cards = /<a\b[^>]*\bclass\s*=\s*["'][^"']*\bseries-card-link\b[^"']*["'][^>]*>[\s\S]*?<\/a>/gi;
   let m: RegExpExecArray | null;
-  while ((m = anchor.exec(html)) !== null && results.length < 70) {
-    const href = localPath(attr('<a ' + m[1] + '>', 'href'));
-    const path = isSeries(href) ? withoutQuery(href).replace(/\/?$/, '/')
-      : isChapter(href) ? seriesPath(href) : '';
-    if (!path || seen[path]) continue;
-    const inner = m[2];
-    const image = firstImage(inner);
-    const heading = /<(?:h[1-5]|strong|b)\b[^>]*>([\s\S]*?)<\/(?:h[1-5]|strong|b)>/i.exec(inner);
-    const titled = attr('<a ' + m[1] + '>', 'title') || (heading ? textOnly(heading[1]) : '')
-      || (/<img\b[^>]*>/i.test(inner) ? attr((inner.match(/<img\b[^>]*>/i) || [''])[0], 'alt') : '');
-    const name = titled || slugTitle(path);
-    // Exclude decorative site-wide links without a title/cover or chapter evidence.
-    if (!image && !titled && !isChapter(href)) continue;
-    if (q && !(name.toLowerCase().includes(q) || slugTitle(path).toLowerCase().includes(q))) continue;
-    seen[path] = true;
-    results.push({ id: path, title: name, cover: image });
+  while ((m = cards.exec(html)) !== null && results.length < 120) {
+    const opening = /^<a\b[^>]*>/i.exec(m[0])?.[0] || '';
+    const path = listingSeriesPath(attr(opening, 'href'));
+    if (!path || seen[matchPath(path)]) continue;
+    const heading = /<h[2-4]\b[^>]*\bclass\s*=\s*["'][^"']*\bseries-card-title\b[^"']*["'][^>]*>([\s\S]*?)<\/h[2-4]>/i.exec(m[0])?.[1] || '';
+    const title = textOnly(heading) || slugTitle(path);
+    if (q && !title.toLocaleLowerCase('fr').includes(q) &&
+      !slugTitle(path).toLocaleLowerCase('fr').includes(q)) continue;
+    const cover = cssCover(m[0]) || firstImage(m[0]);
+    seen[matchPath(path)] = true;
+    results.push({ id: path, title, cover });
   }
   return results;
 }
@@ -409,16 +427,73 @@ function readerImageUrls(html: string): string[] {
   return found;
 }
 
+
+// The site's public "Load More Series" button uses a WordPress AJAX action.
+// The initial HTML has 20 cards; Harbor requests 48-item pages. Cache actual
+// AJAX cards per plugin worker rather than inventing series links for offsets.
+const CATALOGUE_PAGE_SIZE = 20;
+const CATALOGUE_LIMIT = 48;
+let seriesRows: MangaSummary[] = [];
+let seriesNonce = '';
+let seriesNextPage = 2;
+let seriesEnd = false;
+let seriesLoadedAt = 0;
+function ajaxNonce(html: string): string {
+  return /\bmangaverse_ajax\s*=\s*\{[\s\S]*?"nonce"\s*:\s*"([^"]+)"/i.exec(html)?.[1] || '';
+}
+async function getCatalogue(minimumRows: number): Promise<MangaSummary[]> {
+  if (!seriesLoadedAt || Date.now() - seriesLoadedAt > 10 * 60_000) {
+    const homepage = await get(HOME);
+    seriesRows = seriesList(homepage);
+    seriesNonce = ajaxNonce(homepage);
+    seriesNextPage = 2;
+    seriesEnd = !seriesNonce || seriesRows.length < CATALOGUE_PAGE_SIZE;
+    seriesLoadedAt = Date.now();
+  }
+  const target = Math.min(600, Math.max(CATALOGUE_LIMIT, minimumRows));
+  let budget = 8; // Protect Harbor's worker deadline on huge catalogues.
+  while (seriesRows.length < target && !seriesEnd && budget > 0) {
+    const page = seriesNextPage++;
+    budget--;
+    try {
+      const form = [
+        ['action', 'mangaverse_load_more'],
+        ['nonce', seriesNonce], ['page', String(page)],
+        ['type', 'series_grid'], ['lang', 'fr'],
+      ].map(([key, value]) => encodeURIComponent(key) + '=' + encodeURIComponent(value)).join('&');
+      const response = await harbor.http(BASE + '/wp-admin/admin-ajax.php', {
+        method: 'POST', body: form, responseType: 'text', timeoutMs: 10000,
+        headers: { Accept: 'application/json, */*', 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      });
+      if (!response?.ok || response.status !== 200) throw new Error('HTTP ' + response?.status);
+      const data = JSON.parse(String(response.body || '{}')) as {
+        success?: boolean; data?: { html?: string; has_more?: boolean }
+      };
+      if (!data.success || typeof data.data?.html !== 'string') throw new Error('Invalid catalogue AJAX response');
+      const newCards = seriesList(data.data.html);
+      const seen = new Set(seriesRows.map(item => matchPath(item.id)));
+      for (const item of newCards) if (!seen.has(matchPath(item.id))) {
+        seriesRows.push(item);
+        seen.add(matchPath(item.id));
+      }
+      if (!data.data.has_more || !newCards.length) seriesEnd = true;
+    } catch (e) {
+      harbor.log('TooComic FR catalogue page ' + page + ': ' + err(e));
+      seriesEnd = true;
+    }
+  }
+  return seriesRows;
+}
+
 const plugin: MangaProvider = {
   id: 'toocomic-fr',
   name: '🇫🇷 TooComic FR',
   async popular(offset: number) {
-    if (offset > 0) return [];
     try {
-      const entries = seriesList(await get(HOME));
-      if (entries.length) return entries;
-      // Known legitimate user-supplied example, not a fabricated catalogue.
-      return [{ id: EXAMPLE_SERIES, title: '101ᵉ Confession FR' }];
+      const entries = await getCatalogue(Math.max(0, offset) + 48);
+      if (entries.length) return entries.slice(Math.max(0, offset), Math.max(0, offset) + 48);
+      // Real, previously user-verified series fallback.
+      return offset > 0 ? [] : [{ id: EXAMPLE_SERIES, title: '101ᵉ Confession FR' }];
     } catch (e) { return diagnostics('ERR popular: ' + err(e)); }
   },
   async search(query: string, offset: number) {
