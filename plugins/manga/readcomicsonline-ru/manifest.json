@@ -1,10 +1,10 @@
 {
   "id": "readcomicsonline-ru",
   "name": "Read Comics Online",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "lang": "en",
   "nsfw": false,
   "entry": "readcomicsonline-ru.plugin.js",
-  "description": "Read Comics Online source for Western comics. Improved numbered issue labels and reader image parsing; live CDN/image reliability still under test.",
+  "description": "Read Comics Online source for Western comics. Numbered issues, issue-reader fallback and retry for transient HTML failures. Image CDN availability may vary.",
   "website": "https://readcomicsonline.ru/"
 }
