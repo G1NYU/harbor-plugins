@@ -14,10 +14,11 @@
 <div class="container">
 
   <div class="hero">
-    <div class="hero-label">PLUGIN REPOSITORY &middot; HARBOR READER</div>
+    <div class="hero-label">MANGA &middot; COMICS &middot; EBOOKS &middot; HARBOR READER</div>
     <h1>GIINYU'S<br><span>HARBOR</span> REPO</h1>
     <p class="hero-desc">
-      Hand-picked source plugins for manga and eBooks in the Harbor reader.
+      Hand-picked manga, manhwa, manhua, Western comics and eBook plugins for Harbor.
+      English, French, Spanish, Italian, Japanese and multilingual sources.
       Copy a repo URL below, paste it into <code>Extensions</code>, done.
     </p>
   </div>
@@ -31,7 +32,7 @@
       <div class="repo-grid">
         <div class="repo-box">
           <div class="repo-name">Manga <span class="badge tag-manga">repo</span></div>
-          <p class="repo-desc">Manga, manhwa and manhua sources for Harbor's manga engine.</p>
+          <p class="repo-desc">Manga, manhwa, manhua and Western comics, including French-language sources.</p>
           <div class="url-box">
             <code id="url-manga">Loading...</code>
             <button class="btn" onclick="copyUrl('url-manga', this)">COPY</button>
@@ -39,7 +40,7 @@
         </div>
         <div class="repo-box">
           <div class="repo-name">eBook <span class="badge tag-ebook">repo</span></div>
-          <p class="repo-desc">Novel and eBook sources with volume grouping and typography support.</p>
+          <p class="repo-desc">English-language eBook alpha: GinyuBooks, Royal Road, Standard Ebooks and LibGen Stream (download only).</p>
           <div class="url-box">
             <code id="url-ebook">Loading...</code>
             <button class="btn" onclick="copyUrl('url-ebook', this)">COPY</button>
@@ -47,16 +48,24 @@
         </div>
       </div>
       <div class="repo-box" style="margin-top:1rem">
-        <div class="repo-name">Manga Extended <span class="badge badge-warn">optional</span></div>
-        <p class="repo-desc">Everything in the Manga repo plus BatCave and Royal Road. These may show a Cloudflare popup in Harbor, and BatCave often still fails to load afterwards. Use this one instead of the Manga repo, not alongside it.</p>
+        <div class="repo-name">Manga Testing <span class="badge badge-warn">experimental</span></div>
+        <p class="repo-desc">Separate testing catalogue, currently holding the parked BatCave experiment. It may fail behind Cloudflare; install Main for the tested sources. The legacy Extended URL currently mirrors Main.</p>
         <div class="url-box">
-          <code id="url-extended">Loading...</code>
-          <button class="btn" onclick="copyUrl('url-extended', this)">COPY</button>
+          <code id="url-testing">Loading...</code>
+          <button class="btn" onclick="copyUrl('url-testing', this)">COPY</button>
         </div>
+      </div>
+      <div class="source-spotlight">
+        <div class="source-spotlight-heading"><span>NEW IN MAIN</span> &middot; WESTERN COMICS + FRENCH</div>
+        <div class="source-spotlight-pills">
+          <span>Read Comics Online</span><span>OceComic</span><span>LatestComics EN</span><span>🇫🇷 TooComic FR</span>
+        </div>
+        <p>All four were tested in Harbor. TooComic FR covers manga, manhwa and comics; its chapter lists can take longer to load.</p>
       </div>
       <ul class="steps-list">
         <li class="step-item"><span class="step-num">1</span><span><strong>Manga:</strong> Harbor &rarr; Manga &rarr; Set up a source &rarr; Extensions &rarr; paste the manga URL.</span></li>
         <li class="step-item"><span class="step-num">2</span><span><strong>eBook:</strong> Harbor &rarr; eBook &rarr; Sources &rarr; Extensions &rarr; paste the eBook URL.</span></li>
+        <li class="step-item"><span class="step-num">3</span><span><strong>Testing:</strong> optional and experimental; Main is recommended for everyday reading.</span></li>
       </ul>
     </div>
   </div>
@@ -67,16 +76,21 @@
       <span class="card-number">02 / 03</span>
     </div>
     <div class="card-body">
-      <input type="text" id="search-box" class="search-input" placeholder="search by name, id or description" oninput="handleSearch(this.value)">
+      <input type="search" id="search-box" class="search-input" placeholder="Search names, languages or descriptions..." aria-label="Search plugins" oninput="handleSearch(this.value)">
       <div class="filter-chips">
         <button class="chip-btn active" onclick="setFilter('all', this)">All</button>
         <button class="chip-btn" onclick="setFilter('operational', this)">Working</button>
         <button class="chip-btn" onclick="setFilter('verified', this)">Verified</button>
         <button class="chip-btn" onclick="setFilter('popular', this)">Popular</button>
         <button class="chip-btn" onclick="setFilter('manga', this)">Manga</button>
+        <button class="chip-btn" onclick="setFilter('comics', this)">Comics</button>
         <button class="chip-btn" onclick="setFilter('ebook', this)">eBook</button>
         <button class="chip-btn" onclick="setFilter('safe', this)">Safe</button>
         <button class="chip-btn" onclick="setFilter('nsfw', this)">18+</button>
+      </div>
+      <div class="language-filter">
+        <div class="language-filter-heading">LANGUAGES <span>FROM THE PUBLISHED SOURCE LISTS</span></div>
+        <div class="language-chips" id="language-chips" aria-label="Filter by source language"></div>
       </div>
       <div class="catalog-stats" id="catalog-stats">LOADING SOURCES...</div>
       <div class="plugin-list" id="plugin-container"><div class="empty">Loading available sources...</div></div>
@@ -85,18 +99,20 @@
 
   <div class="card">
     <div class="card-header">
-      <span class="card-title">KNOWN ISSUES</span>
+      <span class="card-title">SOURCE NOTES &amp; KNOWN ISSUES</span>
       <span class="card-number">03 / 03</span>
     </div>
     <div class="card-body">
       <ul class="steps-list" style="margin-top:0">
-        <li class="step-item"><span class="step-num">+</span><span><strong>New (24 Oct 2026):</strong> &#9733; Asura Scans is now in the main Manga repo, pinned at the top. It took many attempts to get working in Harbor. Legion Scans (Spanish) was added right below it. Atsumaru, Hijala, ManhwaNex, Thunderscans, MangaKatana, MangaDemon and VortexScans were added the same day.</span></li>
-        <li class="step-item"><span class="step-num">!</span><span><strong>Legion Scans:</strong> browse shows the first page of the catalogue only (31 series), and search has not been tested yet.</span></li>
-        <li class="step-item"><span class="step-num">!</span><span><strong>No covers:</strong> Atsumaru shows series without cover images. Series pages, chapters and reader pages load fine. This looks like a Harbor-side issue and has been reported to Harbor's developers.</span></li>
-        <li class="step-item"><span class="step-num">!</span><span><strong>Mixed chapter sources:</strong> some of the sites VortexScans pulls from (for example NovelBuddy) can show "this chapter could not be loaded from this source". MangaDemon lists chapters from several sites, and only some of them open.</span></li>
-        <li class="step-item"><span class="step-num">!</span><span><strong>Cloudflare sites:</strong> BatCave and Royal Road are in the Manga Extended repo. Sites behind a Cloudflare check open Harbor's check window, but the source can still fail to load afterwards, because Harbor does not pass the cleared cookie on to the plugin's own requests. BatCave is the clearest case.</span></li>
-        <li class="step-item"><span class="step-num">&times;</span><span><strong>Not published:</strong> Kagane (needs a Cloudflare proxy and a browser-only chapter check), Mangasushi, and MangaBuddy (its image host refuses requests without a site Referer, which Harbor cannot send).</span></li>
-        <li class="step-item"><span class="step-num">&times;</span><span><strong>Removed:</strong> MangaFire, MangaTown and Mangapill. Mangapill worked, but its series covers did not show in Harbor.</span></li>
+        <li class="step-item"><span class="step-num">+</span><span><strong>New (11 Nov 2026):</strong> Read Comics Online, OceComic and LatestComics EN bring Western comics into Main. 🇫🇷 TooComic FR has joined Main too, covering French manga, manhwa and comics. All four were tested directly in Harbor.</span></li>
+        <li class="step-item"><span class="step-num">i</span><span><strong>French chapters:</strong> TooComic FR v1.2.2 now returns chapters and cover art in Harbor. Large chapter lists can still be slow; the source is marked French, so chapter language should be French, not English.</span></li>
+        <li class="step-item"><span class="step-num">!</span><span><strong>After updating a plugin:</strong> use the extension's Update button, toggle it off and back on to restart Harbor's cached worker, then clear <strong>Settings &rarr; Storage &rarr; Caches &rarr; Manga browse cache</strong> if covers, titles or chapters still look stale. This does not clear reading history.</span></li>
+        <li class="step-item"><span class="step-num">i</span><span><strong>Language tags:</strong> they reflect each plugin's declared language, not a promise that every series or chapter is available in that language. &ldquo;Multilingual&rdquo; sources may include several languages.</span></li>
+        <li class="step-item"><span class="step-num">!</span><span><strong>Experimental sources:</strong> BatCave is parked in the separate Testing repo, not Main. Its Cloudflare challenge can block reader requests in Harbor. The legacy Extended catalogue currently contains the same sources as Main.</span></li>
+        <li class="step-item"><span class="step-num">!</span><span><strong>Legion Scans:</strong> browsing is limited to the first page (around 31 series); search and full history have not been verified in Harbor.</span></li>
+        <li class="step-item"><span class="step-num">!</span><span><strong>Atsumaru artwork:</strong> some catalogue covers may be blank even when series pages and readers load. Some VortexScans and MangaDemon chapters come from third-party sites and can fail individually.</span></li>
+        <li class="step-item"><span class="step-num">i</span><span><strong>eBook alpha:</strong> eBook sources have different reading capabilities. Library Genesis Stream is download-only; availability and reader support vary by provider.</span></li>
+        <li class="step-item"><span class="step-num">&times;</span><span><strong>Not in Main:</strong> Kagane (Cloudflare), Mangasushi and MangaBuddy (image Referer requirements); MangaFire, MangaTown and Mangapill were removed from the curated catalogue.</span></li>
       </ul>
     </div>
   </div>
@@ -115,7 +131,7 @@
       </div>
     </div>
   </div>
-  <div class="footer-note">Plugins run sandboxed inside Harbor. Availability depends on each source site.</div>
+  <div class="footer-note">Plugins run sandboxed in Harbor. Main is curated; Testing is experimental. Live availability varies by site.</div>
 </footer>
 
 <script>
@@ -128,7 +144,7 @@
 
   document.getElementById('url-manga').textContent = getRepoUrl('manga');
   document.getElementById('url-ebook').textContent = getRepoUrl('ebook');
-  document.getElementById('url-extended').textContent = getRepoUrl('manga', 'repo-extended.json');
+  document.getElementById('url-testing').textContent = getRepoUrl('manga', 'repo-testing.json');
 
   async function copyUrl(elementId, button) {
     const text = document.getElementById(elementId).textContent;
@@ -146,10 +162,62 @@
     }
   }
 
+  const COMIC_SOURCES = new Set(['readcomicsonline-ru', 'ocecomic-com', 'latestcomics-en', 'toocomic-fr']);
+  // Verified in Harbor by the repo owner, separate from automated health reports.
+  const HARBOR_TESTED = new Set(['readcomicsonline-ru', 'ocecomic-com', 'latestcomics-en', 'toocomic-fr']);
+  const LANGUAGE_NAMES = {
+    en: 'English', fr: 'Français', es: 'Español', it: 'Italiano',
+    ja: '日本語', multi: 'Multilingual', pt: 'Português', ar: 'العربية',
+    ko: '한국어', de: 'Deutsch'
+  };
+  const LANGUAGE_ORDER = ['en', 'fr', 'es', 'it', 'ja', 'multi'];
+
+  function normalLang(lang) {
+    const code = String(lang || 'en').trim().toLowerCase();
+    return code === 'jp' ? 'ja' : code;
+  }
+  function languageName(lang) {
+    const code = normalLang(lang);
+    return LANGUAGE_NAMES[code] || code.toUpperCase();
+  }
+  function verifiedSource(p) {
+    return HARBOR_TESTED.has(p.id) || (p.badges || []).includes('Verified');
+  }
+
   let allPlugins = [];
   let healthReports = {};
   let currentFilter = 'all';
+  let currentLanguage = 'all';
   let searchQuery = '';
+
+  function renderLanguageChips() {
+    const wrapper = document.getElementById('language-chips');
+    wrapper.replaceChildren();
+    const counts = new Map();
+    for (const source of allPlugins) {
+      const lang = normalLang(source.lang);
+      counts.set(lang, (counts.get(lang) || 0) + 1);
+    }
+    const languages = [...counts.keys()].sort((a, b) => {
+      const rankA = LANGUAGE_ORDER.indexOf(a);
+      const rankB = LANGUAGE_ORDER.indexOf(b);
+      return (rankA < 0 ? 100 : rankA) - (rankB < 0 ? 100 : rankB) || a.localeCompare(b);
+    });
+    for (const lang of ['all', ...languages]) {
+      const count = lang === 'all' ? allPlugins.length : counts.get(lang);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'chip-btn language-chip' + (currentLanguage === lang ? ' active' : '');
+      button.setAttribute('aria-pressed', String(currentLanguage === lang));
+      button.textContent = (lang === 'all' ? 'All languages' : languageName(lang)) + ' · ' + count;
+      button.addEventListener('click', () => {
+        currentLanguage = lang;
+        renderLanguageChips();
+        renderCatalog();
+      });
+      wrapper.append(button);
+    }
+  }
 
   function renderCatalog() {
     const container = document.getElementById('plugin-container');
@@ -158,23 +226,33 @@
     const filtered = allPlugins.filter((p) => {
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
-        const hit = (p.name || '').toLowerCase().includes(q) || (p.id || '').toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q);
+        const hit = (p.name || '').toLowerCase().includes(q) ||
+          (p.id || '').toLowerCase().includes(q) ||
+          (p.description || '').toLowerCase().includes(q) ||
+          languageName(p.lang).toLowerCase().includes(q);
         if (!hit) return false;
       }
+      if (currentLanguage !== 'all' && normalLang(p.lang) !== currentLanguage) return false;
       if (currentFilter === 'operational') {
         const h = healthReports[p.id];
-        return h && h.overallStatus === 'OPERATIONAL';
+        return verifiedSource(p) || (h && h.overallStatus === 'OPERATIONAL');
       }
-      if (currentFilter === 'verified') return (p.badges || []).includes('Verified');
+      if (currentFilter === 'verified') return verifiedSource(p);
       if (currentFilter === 'popular') return (p.badges || []).includes('Popular');
       if (currentFilter === 'manga') return p.type === 'manga';
+      if (currentFilter === 'comics') return COMIC_SOURCES.has(p.id);
       if (currentFilter === 'ebook') return p.type === 'ebook';
       if (currentFilter === 'safe') return !p.nsfw;
       if (currentFilter === 'nsfw') return p.nsfw;
       return true;
     });
 
-    stats.textContent = 'SHOWING ' + filtered.length + ' / ' + allPlugins.length + ' SOURCES';
+    const mangaCount = allPlugins.filter((p) => p.type === 'manga').length;
+    const ebookCount = allPlugins.filter((p) => p.type === 'ebook').length;
+    const comicsCount = allPlugins.filter((p) => COMIC_SOURCES.has(p.id)).length;
+    stats.textContent = 'SHOWING ' + filtered.length + ' / ' + allPlugins.length +
+      ' SOURCES · ' + mangaCount + ' MANGA / COMICS · ' + ebookCount +
+      ' EBOOK · ' + comicsCount + ' COMIC-FRIENDLY';
 
     if (filtered.length === 0) {
       container.innerHTML = '<div class="empty">No matching plugins found.</div>';
@@ -182,9 +260,11 @@
     }
 
     container.innerHTML = filtered.map((p) => {
-      const isVerified = (p.badges || []).includes('Verified');
+      const isVerified = verifiedSource(p);
       const isPopular = (p.badges || []).includes('Popular');
-      const health = healthReports[p.id];
+      // An old health-report result must not contradict a fresh user-tested source.
+      const health = HARBOR_TESTED.has(p.id) ? null : healthReports[p.id];
+      const isComic = COMIC_SOURCES.has(p.id);
 
       let healthBadge = '';
       if (health) {
@@ -203,10 +283,11 @@
         '<div class="plugin-item-header"><h3>' + esc(p.name) + '</h3><span class="plugin-version">v' + esc(p.version) + '</span></div>' +
         '<p>' + esc(p.description || 'No description provided.') + '</p>' +
         '<div class="badges">' +
-          '<span class="badge ' + (p.type === 'manga' ? 'tag-manga' : 'tag-ebook') + '">' + esc(p.type) + '</span>' +
-          '<span class="badge">' + esc(p.lang || 'en') + '</span>' +
+          '<span class="badge ' + (p.type === 'manga' ? 'tag-manga' : 'tag-ebook') + '">' +
+            esc(isComic ? 'Comics / manga' : p.type) + '</span>' +
+          '<span class="badge">' + esc(languageName(p.lang)) + '</span>' +
           healthBadge +
-          (isVerified ? '<span class="badge badge-verified">Verified</span>' : '') +
+          (isVerified ? '<span class="badge badge-verified" title="Tested in Harbor">Verified</span>' : '') +
           (isPopular ? '<span class="badge badge-popular">Popular</span>' : '') +
           (p.nsfw ? '<span class="badge badge-nsfw">18+</span>' : '') +
         '</div></div>';
@@ -253,6 +334,7 @@
       }
     } catch (_) {}
 
+    renderLanguageChips();
     renderCatalog();
   }
 

@@ -58,3 +58,34 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .footer-link{font-family:var(--mono);font-size:.65rem;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:.15em .5em;border-radius:3px;transition:all .15s}
 .footer-link:hover{border-color:var(--lime);color:var(--lime)}
 .footer-note{font-family:var(--mono);font-size:.62rem;color:var(--muted);max-width:340px;text-align:right}
+
+/* Updated catalogue: manga/comics spotlight and manifest-driven language filters */
+.source-spotlight{
+  margin-top:1rem;padding:1rem;border:1px solid rgba(200,245,58,.25);
+  border-left:3px solid var(--lime);border-radius:var(--radius);
+  background:linear-gradient(115deg,rgba(200,245,58,.08),rgba(0,0,0,.15) 75%);
+}
+.source-spotlight-heading{font-family:var(--mono);font-size:.67rem;letter-spacing:.08em;color:var(--muted)}
+.source-spotlight-heading span{font-weight:700;color:var(--lime)}
+.source-spotlight-pills{display:flex;flex-wrap:wrap;gap:.42rem;margin:.7rem 0}
+.source-spotlight-pills span{
+  font-family:var(--mono);font-size:.64rem;line-height:1.4;
+  border:1px solid rgba(200,245,58,.28);color:var(--text);
+  border-radius:4px;padding:.28rem .55rem;background:rgba(0,0,0,.28)
+}
+.source-spotlight p{font-family:var(--mono);font-size:.67rem;color:var(--muted);line-height:1.65}
+.language-filter{
+  margin-top:1rem;padding:.85rem .9rem;border-radius:var(--radius);
+  border:1px solid var(--border);background:rgba(0,0,0,.22)
+}
+.language-filter-heading{font-family:var(--mono);font-size:.68rem;letter-spacing:.09em;color:#fff;font-weight:700}
+.language-filter-heading span{color:var(--muted);font-weight:400;font-size:.62rem;letter-spacing:.04em;margin-left:.4rem}
+.language-chips{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.65rem}
+.language-chip{letter-spacing:0;text-transform:none;font-size:.68rem}
+.chip-btn:focus-visible,.btn:focus-visible,.search-input:focus-visible{
+  outline:2px solid var(--lime);outline-offset:3px
+}
+@media(max-width:540px){
+  .language-filter-heading span{display:block;margin:.2rem 0 0}
+  .source-spotlight-pills span{font-size:.6rem}
+}
