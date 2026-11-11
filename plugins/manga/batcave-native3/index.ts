@@ -14,16 +14,7 @@ const HEADERS = {
   Accept: 'text/html,application/xhtml+xml,application/json,*/*',
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
 };
-let lastError = '';
-
-function err(e: unknown): string { return String((e as Error)?.message || e).slice(0, 160); }
-function diagnostics(message: string): MangaSummary[] {
-  lastError = message;
-  const out: MangaSummary[] = [];
-  for (let i = 0; i < message.length && out.length < 12; i += 35)
-    out.push({ id: 'error-' + out.length, title: message.slice(i, i + 35) });
-  return out;
-}
+function errorText(e: unknown): string { return e instanceof Error ? e.message : String(e); }
 function unescape(raw: string): string {
   return String(raw || '').replace(/&amp;/gi, '&').replace(/&quot;/gi, '"')
     .replace(/&#(?:0*39|x0*27);/gi, "'").replace(/&lt;/gi, '<').replace(/&gt;/gi, '>');
@@ -48,7 +39,7 @@ async function request(url: string, opts?: { method?: string; body?: string; hea
   const status = Number(r?.status ?? 0);
   const body = String(r?.body || '');
   if (status === 403 || /(?:just a moment|cf-challenge|\/_c\b|pow_nonce)/i.test(body.slice(0, 1500)))
-    throw new Error('HTTP ' + status + ': BatCave guard. Unlock BatCave using the globe button in Harbor Extensions.');
+    throw new Error('HTTP ' + status + ': BatCave DLE Guard not cleared. Open the source WebView and retry.');
   if (status !== 200) throw new Error('HTTP ' + status + ' at ' + url.slice(0, 120));
   return r;
 }
@@ -86,10 +77,30 @@ async function seriesList(source: string): Promise<MangaSummary[]> {
   return list;
 }
 function chapterData(source: string): any {
-  const m = /window\.__DATA__\s*=\s*(\{[\s\S]*?\})\s*;/i.exec(source);
-  if (!m) throw new Error('No window.__DATA__ chapter list in BatCave HTML');
-  try { return JSON.parse(m[1]); }
-  catch { throw new Error('BatCave chapter JSON malformed'); }
+  const marker = /window\.__DATA__\s*=\s*/i.exec(source);
+  if (!marker) throw new Error('No BatCave chapter data in HTML');
+  const start = marker.index + marker[0].length;
+  if (source[start] !== '{') throw new Error('BatCave chapter data is not a JSON object');
+  let depth = 0, inString = false, escaped = false;
+  for (let i = start; i < source.length; i++) {
+    const ch = source[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+    } else if (ch === '"') {
+      inString = true;
+    } else if (ch === '{') {
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        try { return JSON.parse(source.slice(start, i + 1)); }
+        catch { throw new Error('BatCave chapter data JSON malformed'); }
+      }
+    }
+  }
+  throw new Error('BatCave chapter data JSON incomplete');
 }
 function parseImages(response: string): string[] {
   let json: any;
@@ -115,20 +126,20 @@ const plugin: MangaProvider = {
 
   async popular(offset: number) {
     if (offset > 0) return [];
-    try { return await seriesList(await html('/comix/')); }
-    catch (e) { return diagnostics('ERR popular: ' + err(e)); }
+    const body = 'dlenewssortby=rating&dledirection=desc&set_new_sort=dle_sort_cat_1&set_direction_sort=dle_direction_cat_1';
+    const response = await request(BASE + '/comix/', { method: 'POST', body,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+    return seriesList(String(response.body || ''));
   },
 
   async search(query: string, offset: number) {
     if (offset > 0) return [];
     const q = String(query || '').trim();
     if (!q) return this.popular(0);
-    try { return await seriesList(await html('/search/' + encodeURIComponent(q) + '/')); }
-    catch (e) { return diagnostics('ERR search: ' + err(e)); }
+    return seriesList(await html('/search/' + encodeURIComponent(q) + '/'));
   },
 
   async detail(id: string) {
-    if (id.startsWith('error-')) return { id, title: lastError, description: lastError };
     if (!seriesId(BASE + id)) return null;
     try {
       const source = await html(id);
@@ -138,9 +149,7 @@ const plugin: MangaProvider = {
       const cover = abs(image?.attr('src') || '') || abs(meta(source, 'og:image'));
       const description = cleanTitle(doc.querySelector('div.page__text')?.text() || meta(source, 'og:description') || '');
       return { id, title, cover: cover || undefined, description: description || undefined };
-    } catch (e) {
-      return { id, title: 'ERR detail: ' + err(e), description: err(e) };
-    }
+    } catch (e) { throw new Error('BatCave details: ' + errorText(e)); }
   },
 
   async chapters(id: string) {
@@ -160,13 +169,10 @@ const plugin: MangaProvider = {
       }
       if (!chapters.length) throw new Error('0 chapters in __DATA__');
       return chapters.sort((a, b) => Number(b.chapter || 0) - Number(a.chapter || 0));
-    } catch (e) {
-      return [{ id: id + '#debug', chapter: null, title: 'ERR chapters: ' + err(e), pages: 0, language: 'en' }];
-    }
+    } catch (e) { throw new Error('BatCave chapters: ' + errorText(e)); }
   },
 
   async pageUrls(chapterId: string) {
-    if (chapterId.endsWith('#debug')) return [];
     const { newsId, chapterId: cid } = ids(chapterId);
     const payload = JSON.stringify({ news_id: newsId, chapter_id: cid });
     let r = await request(BASE + API, { method: 'POST', body: payload,

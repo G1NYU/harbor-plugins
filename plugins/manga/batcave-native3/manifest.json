@@ -1,10 +1,10 @@
 {
   "id": "batcave-native3",
   "name": "BatCave Native v3 (WebView test)",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "lang": "en",
   "nsfw": false,
   "entry": "batcave-native3.plugin.js",
-  "description": "Native BatCave reader in testing. Requires user-initiated WebView session in RE-Harbor patch; experimental and unverified end to end.",
+  "description": "Native BatCave test source. Uses Mihon's catalogue POST and does not fabricate error entries; WebView DLE support requires the preview branch.",
   "website": "https://batcave.biz/"
 }
