@@ -1,10 +1,10 @@
 {
   "id": "latestcomics-en",
   "name": "LatestComics EN [TEST]",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "lang": "en",
   "nsfw": false,
   "entry": "latestcomics-en.plugin.js",
-  "description": "Western comics source. CSS cover extraction for browse/search grids; direct reader images and WordPress AJAX issue pagination.",
+  "description": "Western comics source. Reliable catalogue covers resolved from detail images, direct reader pages and full issue pagination.",
   "website": "https://www.latestcomics.com/en/"
 }

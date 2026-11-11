@@ -237,12 +237,50 @@ function readerImages(body: string): string[] {
   return out;
 }
 
+// Catalogue cards use CSS thumbnails, whereas the detail page uses a
+// conventional <img>. Harbor's detail view loads that image successfully.
+// Resolve each visible result through the detail cover path so browse/search
+// don't depend on CSS thumbnail parsing or WordPress resized-image variants.
+const detailCoverCache = new Map<string, string>();
+async function detailCover(id: string): Promise<string | undefined> {
+  const previous = detailCoverCache.get(id);
+  if (previous) return previous;
+  if (!/^[a-z0-9][a-z0-9-]*$/i.test(id)) return undefined;
+  try {
+    const body = await html('/en/comic/' + id + '.html');
+    const section = innerDiv(body,
+      /<div\b[^>]*\bclass\s*=\s*["'][^"']*\bseries-header-thumbnail\b[^"']*["'][^>]*>/i);
+    const resolved = firstImage(section);
+    if (resolved) detailCoverCache.set(id, resolved);
+    return resolved;
+  } catch (error) {
+    harbor.log('LatestComics cover lookup: ' + id + ' — ' +
+      (error instanceof Error ? error.message : String(error)));
+    return undefined;
+  }
+}
+async function catalogueWithDetailCovers(rows: MangaSummary[]): Promise<MangaSummary[]> {
+  const results = [...rows];
+  // Limit concurrent connections to this WordPress origin; avoid blocking
+  // the entire catalogue when an individual cover request times out.
+  for (let start = 0; start < results.length; start += 5) {
+    const part = results.slice(start, start + 5);
+    const covers = await Promise.all(part.map(item => detailCover(item.id)));
+    covers.forEach((cover, index) => {
+      if (cover) results[start + index] = { ...part[index], cover };
+    });
+  }
+  harbor.log('LatestComics covers: ' +
+    results.filter(item => !!item.cover).length + '/' + results.length);
+  return results;
+}
+
 const plugin: MangaProvider = {
   id: SOURCE_ID,
   name: 'LatestComics EN [TEST]',
   async popular(offset: number) {
     const all = catalogue(await html('/en/'));
-    return all.slice(Math.max(0, offset), Math.max(0, offset) + PAGE_LIMIT);
+    return catalogueWithDetailCovers(all.slice(Math.max(0, offset), Math.max(0, offset) + PAGE_LIMIT));
   },
   async search(query: string, offset: number) {
     const q = String(query || '').trim();
@@ -256,7 +294,7 @@ const plugin: MangaProvider = {
       found = catalogue(await html('/en/')).filter(x => x.title.toLowerCase().includes(needle) ||
         x.id.replace(/-/g, ' ').includes(needle));
     }
-    return found.slice(Math.max(0, offset), Math.max(0, offset) + PAGE_LIMIT);
+    return catalogueWithDetailCovers(found.slice(Math.max(0, offset), Math.max(0, offset) + PAGE_LIMIT));
   },
   async detail(id: string) {
     if (!/^[a-z0-9][a-z0-9-]*$/i.test(id)) return null;
@@ -265,6 +303,7 @@ const plugin: MangaProvider = {
     const title = textOnly(heading) || human(id);
     const coverSection = innerDiv(body, /<div\b[^>]*\bclass\s*=\s*["'][^"']*\bseries-header-thumbnail\b[^"']*["'][^>]*>/i);
     const cover = firstImage(coverSection) || undefined;
+    if (cover) detailCoverCache.set(id, cover);
     const description = textOnly(innerDiv(body,
       /<div\b[^>]*\bclass\s*=\s*["'][^"']*\bseries-description\b[^"']*["'][^>]*>/i));
     return { id, title, cover, description: description || undefined };
