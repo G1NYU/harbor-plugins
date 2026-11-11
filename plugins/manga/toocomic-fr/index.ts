@@ -129,7 +129,14 @@ function cssCover(fragment: string): string | undefined {
       try {
         const u = new URL(entity(raw), BASE);
         if (u.protocol !== 'https:') continue;
-        if (!/^(?:www\.|cdn\.)?toocomic\.com$/i.test(u.hostname)) continue;
+        // The server-rendered first 20 cards use toocomic.com, but the
+        // site's AJAX "Load More Series" response switches cover hosting
+        // to mangared.com starting at card 21. Both domains and real image
+        // files were verified against the site's live DOM.
+        const isLocal = /^(?:www\.|cdn\.)?toocomic\.com$/i.test(u.hostname);
+        const isMangaredCover = /^(?:www\.)?mangared\.com$/i.test(u.hostname) &&
+          u.pathname.startsWith('/wp-content/uploads/');
+        if (!isLocal && !isMangaredCover) continue;
         if (!/\.(?:jpe?g|png|webp|avif)$/i.test(u.pathname)) continue;
         return u.href;
       } catch { /* invalid cover URL */ }
