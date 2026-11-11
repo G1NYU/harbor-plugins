@@ -116,14 +116,23 @@ function listingSeriesPath(raw: string): string {
   return isSeries(path) ? withoutQuery(path).replace(/\/?$/, '/') : '';
 }
 function cssCover(fragment: string): string | undefined {
+  // The first 20 homepage cards use /wp-content/uploads/ backgrounds.
+  // Further cards are appended by the MangaVerse AJAX response; don't assume
+  // the image host or upload directory always matches the initial batch.
   for (const tag of fragment.match(/<div\b[^>]*>/gi) || []) {
     if (!attr(tag, 'class').split(/\s+/).includes('series-card-thumb')) continue;
-    const style = attr(tag, 'style');
-    const raw = /background(?:-image)?\s*:\s*url\(\s*(['"]?)(.*?)\1\s*\)/i.exec(style)?.[2];
-    if (!raw) continue;
-    const resolved = abs(raw);
-    if (/^https:\/\/(?:www\.)?toocomic\.com\/wp-content\/uploads\/[^?#]+\.(?:jpe?g|png|webp|avif)$/i.test(resolved)) {
-      return resolved;
+    const css = attr(tag, 'style');
+    const cssUrl = /background(?:-image)?\s*:\s*url\(\s*(['"]?)(.*?)\1\s*\)/i.exec(css)?.[2] || '';
+    for (const raw of [cssUrl, attr(tag, 'data-bg'), attr(tag, 'data-background'),
+      attr(tag, 'data-image'), attr(tag, 'data-src')]) {
+      if (!raw) continue;
+      try {
+        const u = new URL(entity(raw), BASE);
+        if (u.protocol !== 'https:') continue;
+        if (!/^(?:www\.|cdn\.)?toocomic\.com$/i.test(u.hostname)) continue;
+        if (!/\.(?:jpe?g|png|webp|avif)$/i.test(u.pathname)) continue;
+        return u.href;
+      } catch { /* invalid cover URL */ }
     }
   }
   return undefined;
