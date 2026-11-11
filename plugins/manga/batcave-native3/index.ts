@@ -1,10 +1,12 @@
 /**
  * BatCave Native v3 — Harbor testing source (no Paperback or Suwayomi runtime).
  *
- * Uses BatCave's public HTML for search/catalogue and the same chapter AJAX
- * endpoint used by Mihon/Paperback. The site requires its DLE Guard browser
- * session: the user must first unlock BatCave in Harbor's native WebView.
- * This is experimental and NOT verified end-to-end in Harbor.
+ * Uses BatCave's public HTML for search/catalogue. Pages are extracted
+ * directly from each /reader/... HTML's __DATA__. The BatCave AJAX endpoint
+ * remains a secondary fallback for older HTML variants. This is experimental
+ * and NOT verified end-to-end in Harbor (DLE session handoff still required).
+ *
+ * Reference: Kotatsu-Redo/kotatsu-parsers-redo/.../site/en/BatCave.kt
  */
 import type { MangaChapter, MangaProvider, MangaSummary } from '@shared/types/manga.js';
 
@@ -72,14 +74,15 @@ async function seriesList(source: string): Promise<MangaSummary[]> {
     seen.add(id);
     const coverEl = box.querySelector('.readed__img img');
     const cover = coverEl ? abs(coverEl.attr('data-src') || coverEl.attr('src') || '') : '';
-    list.push({ id, title, cover: cover || BASE + '/uploads/posts/hd/' + (id.match(/^\/(\d+)/) || [,''])[1] + '.webp' });
+    list.push({ id, title, cover: cover || undefined });
   }
   return list;
 }
 function chapterData(source: string): any {
-  const marker = /window\.__DATA__\s*=\s*/i.exec(source);
+  const marker = /(?:window\.)?__DATA__\s*=\s*/i.exec(source);
   if (!marker) throw new Error('No BatCave chapter data in HTML');
-  const start = marker.index + marker[0].length;
+  let start = marker.index + marker[0].length;
+  while (/\s/.test(source[start] || '')) start++;
   if (source[start] !== '{') throw new Error('BatCave chapter data is not a JSON object');
   let depth = 0, inString = false, escaped = false;
   for (let i = start; i < source.length; i++) {
@@ -102,18 +105,26 @@ function chapterData(source: string): any {
   }
   throw new Error('BatCave chapter data JSON incomplete');
 }
-function parseImages(response: string): string[] {
-  let json: any;
-  try { json = JSON.parse(response); } catch { throw new Error('BatCave chapter API did not return JSON'); }
-  if (json?.success === false) throw new Error('BatCave chapter API rejected request');
-  const images: unknown[] = Array.isArray(json?.data?.images) ? json.data.images : [];
+function imagesFromData(data: any): string[] {
+  // Kotatsu's BatCave reader exposes a top-level __DATA__.images array;
+  // the older AJAX endpoint wraps the same images under data.images.
+  const raw = Array.isArray(data?.images)
+    ? data.images : Array.isArray(data?.data?.images) ? data.data.images : [];
   const urls: string[] = [];
-  for (const item of images) {
-    const raw = typeof item === 'string' ? item : typeof item === 'object' && item ? (item as any).url : '';
-    const url = abs(String(raw || ''));
+  for (const item of raw) {
+    const entry = typeof item === 'string' ? item
+      : item && typeof item === 'object' ? String(item.url || item.src || '') : '';
+    const url = abs(entry);
     if (url && !urls.includes(url)) urls.push(url);
   }
   return urls;
+}
+function parseImages(response: string): string[] {
+  let json: any;
+  try { json = JSON.parse(response); }
+  catch { throw new Error('BatCave chapter API did not return JSON'); }
+  if (json?.success === false) throw new Error('BatCave chapter API rejected request');
+  return imagesFromData(json);
 }
 function ids(chapterId: string): { newsId: string; chapterId: string } {
   const m = /^\/?reader\/(\d+)\/(\d+)(?:[/?#]|$)/i.exec(chapterId);
@@ -122,7 +133,7 @@ function ids(chapterId: string): { newsId: string; chapterId: string } {
 }
 const plugin: MangaProvider = {
   id: 'batcave-native3',
-  name: 'BatCave Native v3 (WebView test)',
+  name: 'BatCave Native v3 (reader-first test)',
 
   async popular(offset: number) {
     if (offset > 0) return [];
@@ -174,20 +185,44 @@ const plugin: MangaProvider = {
 
   async pageUrls(chapterId: string) {
     const { newsId, chapterId: cid } = ids(chapterId);
-    const payload = JSON.stringify({ news_id: newsId, chapter_id: cid });
-    let r = await request(BASE + API, { method: 'POST', body: payload,
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' } });
-    let pages = parseImages(String(r.body || ''));
-    // Paperback's version of the AJAX endpoint uses form data; try it if JSON
-    // succeeded but returned no pages, rather than fabricating page URLs.
-    if (!pages.length) {
-      const body = 'news_id=' + encodeURIComponent(newsId) + '&chapter_id=' + encodeURIComponent(cid);
-      r = await request(BASE + API, { method: 'POST', body,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' } });
-      pages = parseImages(String(r.body || ''));
+    // Kotatsu-Redo reads the images straight from the chapter's own HTML.
+    // This avoids depending on a second guarded AJAX request when possible.
+    let readerFailure = '';
+    try {
+      const source = await html('/reader/' + newsId + '/' + cid);
+      const pages = imagesFromData(chapterData(source));
+      if (pages.length) return pages;
+      readerFailure = 'reader HTML returned no images';
+    } catch (e) {
+      readerFailure = errorText(e);
     }
-    if (!pages.length) throw new Error('0 BatCave chapter images after native API request');
-    return pages;
+
+    // Fallback for sites/versions where images are only served via AJAX.
+    // Mihon uses JSON, while Paperback uses URL-encoded POST data.
+    let apiFailure = '';
+    for (const isJson of [true, false]) {
+      try {
+        const body = isJson
+          ? JSON.stringify({ news_id: newsId, chapter_id: cid })
+          : 'news_id=' + encodeURIComponent(newsId) + '&chapter_id=' + encodeURIComponent(cid);
+        const response = await request(BASE + API, {
+          method: 'POST',
+          body,
+          headers: {
+            'Content-Type': isJson
+              ? 'application/json' : 'application/x-www-form-urlencoded',
+            Accept: 'application/json',
+          },
+        });
+        const pages = parseImages(String(response.body || ''));
+        if (pages.length) return pages;
+        apiFailure = 'API returned zero images';
+      } catch (e) {
+        apiFailure = errorText(e);
+      }
+    }
+    throw new Error('BatCave chapter unavailable: reader ' + readerFailure + '; API ' + apiFailure);
+  }
   },
 };
 harbor.register(plugin);

@@ -1,10 +1,10 @@
 {
   "id": "batcave-native3",
-  "name": "BatCave Native v3 (WebView test)",
-  "version": "0.3.1",
+  "name": "BatCave Native v3 (reader-first test)",
+  "version": "0.3.2",
   "lang": "en",
   "nsfw": false,
   "entry": "batcave-native3.plugin.js",
-  "description": "Native BatCave test source. Uses Mihon's catalogue POST and does not fabricate error entries; WebView DLE support requires the preview branch.",
+  "description": "Experimental standalone BatCave source: chapter reader HTML __DATA__ first, API fallback; DLE challenge clearance not yet verified.",
   "website": "https://batcave.biz/"
 }
