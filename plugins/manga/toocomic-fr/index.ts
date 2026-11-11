@@ -116,14 +116,23 @@ function listingSeriesPath(raw: string): string {
   return isSeries(path) ? withoutQuery(path).replace(/\/?$/, '/') : '';
 }
 function cssCover(fragment: string): string | undefined {
+  // The first 20 homepage cards use /wp-content/uploads/ backgrounds.
+  // Further cards are appended by the MangaVerse AJAX response; don't assume
+  // the image host or upload directory always matches the initial batch.
   for (const tag of fragment.match(/<div\b[^>]*>/gi) || []) {
     if (!attr(tag, 'class').split(/\s+/).includes('series-card-thumb')) continue;
-    const style = attr(tag, 'style');
-    const raw = /background(?:-image)?\s*:\s*url\(\s*(['"]?)(.*?)\1\s*\)/i.exec(style)?.[2];
-    if (!raw) continue;
-    const resolved = abs(raw);
-    if (/^https:\/\/(?:www\.)?toocomic\.com\/wp-content\/uploads\/[^?#]+\.(?:jpe?g|png|webp|avif)$/i.test(resolved)) {
-      return resolved;
+    const css = attr(tag, 'style');
+    const cssUrl = /background(?:-image)?\s*:\s*url\(\s*(['"]?)(.*?)\1\s*\)/i.exec(css)?.[2] || '';
+    for (const raw of [cssUrl, attr(tag, 'data-bg'), attr(tag, 'data-background'),
+      attr(tag, 'data-image'), attr(tag, 'data-src')]) {
+      if (!raw) continue;
+      try {
+        const u = new URL(entity(raw), BASE);
+        if (u.protocol !== 'https:') continue;
+        if (!/^(?:www\.|cdn\.)?toocomic\.com$/i.test(u.hostname)) continue;
+        if (!/\.(?:jpe?g|png|webp|avif)$/i.test(u.pathname)) continue;
+        return u.href;
+      } catch { /* invalid cover URL */ }
     }
   }
   return undefined;
@@ -366,14 +375,99 @@ async function expandNumberedChapters(chapters: MangaChapter[]): Promise<MangaCh
   mergeChapters(chapters, inferred);
   return chapterSort(chapters);
 }
+// MangaVerse chapter archives are served by a genuine WordPress AJAX endpoint.
+// The legacy pager+URL-verification strategy could make 15+ serial requests,
+// then dozens of additional probes, exceeding Harbor's 25-second chapter-worker
+// deadline. Fetch actual archive HTML in small parallel batches instead.
+interface ChapterAjaxConfig { nonce: string; category: string; count: number }
+function chapterAjaxConfig(html: string): ChapterAjaxConfig | null {
+  const nonce = ajaxNonce(html);
+  const chaptersTag = (html.match(/<div\b[^>]*>/gi) || []).find(
+    tag => attr(tag, 'class').split(/\s+/).includes('chapters-list')
+  ) || '';
+  const category = attr(chaptersTag, 'data-category');
+  const countText = textOnly((/<span\b[^>]*class=["'][^"']*series-chapter-count[^"']*["'][^>]*>([\s\S]*?)<\/span>/i.exec(html) || [,''])[1]);
+  const count = Number(/([\d\s,.]+)\s+Chapitres?\b/i.exec(countText)?.[1]?.replace(/[^\d]/g, '') || 0);
+  return nonce && /^\d+$/.test(category) ? { nonce, category, count } : null;
+}
+async function ajaxChapters(
+  series: string, cfg: ChapterAjaxConfig, page: number, order: 'asc' | 'desc'
+): Promise<{ rows: MangaChapter[]; hasMore: boolean }> {
+  const body = [
+    ['action', 'mangaverse_load_more'], ['nonce', cfg.nonce],
+    ['page', String(page)], ['type', 'series'],
+    ['category_id', cfg.category], ['order', order], ['lang', 'fr'],
+  ].map(([key, value]) => encodeURIComponent(key) + '=' + encodeURIComponent(value)).join('&');
+  const r = await harbor.http(BASE + '/wp-admin/admin-ajax.php', {
+    method: 'POST', body, responseType: 'text', timeoutMs: 5500,
+    headers: { Accept: 'application/json, */*', 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+  });
+  if (!r?.ok || Number(r.status) !== 200) throw new Error('AJAX HTTP ' + r?.status);
+  const response = JSON.parse(String(r.body || '{}')) as {
+    success?: boolean; data?: { html?: string; has_more?: boolean };
+  };
+  if (!response.success || typeof response.data?.html !== 'string') {
+    throw new Error('Invalid chapter archive response at page ' + page);
+  }
+  return { rows: chapterList(response.data.html, series), hasMore: !!response.data.has_more };
+}
 async function allChapters(series: string): Promise<MangaChapter[]> {
   const html = await get(series);
   const visible = chapterList(html, series);
   if (!visible.length) return [];
-  const paginated = await paginatedChapters(series, html, visible);
-  // A page containing chapter 1 is not necessarily the *full* index; the
-  // site might have jumped from the newest ten directly to the first ten.
-  return await expandNumberedChapters(paginated);
+  const cfg = chapterAjaxConfig(html);
+  if (!cfg) {
+    // Do not risk another worker timeout on legacy pagination probes.
+    // The visible real chapter links are always preferable to returning zero.
+    harbor.log('TooComic FR: native chapter pagination unavailable, returning visible links');
+    return chapterSort(visible);
+  }
+
+  const started = Date.now();
+  const out = visible.slice();
+  let canLoadMore = true;
+
+  // First load page two and the site's genuine oldest-first page. Even if
+  // later batches run out of time, both current and early chapters remain.
+  const anchors = await Promise.all([
+    ajaxChapters(series, cfg, 2, 'desc').catch((e: unknown) => {
+      harbor.log('TooComic FR chapter page 2: ' + err(e)); return null;
+    }),
+    ajaxChapters(series, cfg, 1, 'asc').catch((e: unknown) => {
+      harbor.log('TooComic FR oldest chapters: ' + err(e)); return null;
+    }),
+  ]);
+  for (const entry of anchors) if (entry) mergeChapters(out, entry.rows);
+  if (anchors[0] && !anchors[0].hasMore) canLoadMore = false;
+  if (!anchors[0] || !anchors[0].rows.length) {
+    // This site's AJAX may be blocked in a particular Harbor installation.
+    // Return the valid server-rendered chapters, never an empty/error result.
+    return chapterSort(out);
+  }
+
+  // Most manhwa have 10 HTML links per archive page. Cover up to 48 pages
+  // with bounded 5-request batches; let the server be the chapter authority.
+  const perPage = Math.max(1, visible.length);
+  const lastPage = cfg.count > 0
+    ? Math.min(48, Math.ceil(cfg.count / perPage))
+    : 28;
+  for (let start = 3; start <= lastPage && canLoadMore; start += 5) {
+    if (Date.now() - started > 14000) break;
+    const numbers = Array.from(
+      { length: Math.min(5, lastPage - start + 1) }, (_, i) => start + i
+    );
+    const results = await Promise.all(numbers.map(page =>
+      ajaxChapters(series, cfg, page, 'desc').catch((e: unknown) => {
+        harbor.log('TooComic FR chapter page ' + page + ': ' + err(e));
+        return null;
+      })
+    ));
+    results.forEach(result => { if (result) mergeChapters(out, result.rows); });
+    if (results.every(result => result && !result.hasMore)) canLoadMore = false;
+  }
+  harbor.log('TooComic FR chapters: ' + out.length + ' / ' + (cfg.count || '?') +
+    ' discovered in ' + (Date.now() - started) + 'ms');
+  return chapterSort(out);
 }
 
 interface ImageHit { url: string; score: number; index: number; }
