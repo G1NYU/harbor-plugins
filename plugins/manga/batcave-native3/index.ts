@@ -222,7 +222,6 @@ const plugin: MangaProvider = {
       }
     }
     throw new Error('BatCave chapter unavailable: reader ' + readerFailure + '; API ' + apiFailure);
-  }
   },
 };
 harbor.register(plugin);
