@@ -3,12 +3,12 @@ import path from 'node:path';
 
 const DIST = path.join(process.cwd(), 'dist', 'manga');
 
-const ORDER = ['asura-seanime-v2','asura-seanime','legion-scans','weebcentral','kaynscan','projectsuki','mangadex','nhentai','mgeko','kingofshojo','manhuaplus','flamecomics','hivetoons','mangadistrict','manhwaclub','lilymanga','mangaworld','mangaworldadult','rawkuma','tcbscans','lnori','scythescans','reimanga','cocomic','manhwatoon','samuraiscan','mangaberri','mangacherri','chikari','rinkocomics','rokaricomics','scansgg','dankefurslesen','thunderscans','mangakatana','mangademon','vortexscans','hijala','manhwanex','atsumaru'];
+const ORDER = ['asura-seanime-v2','asura-seanime','legion-scans','readcomicsonline-ru','weebcentral','kaynscan','projectsuki','mangadex','nhentai','mgeko','kingofshojo','manhuaplus','flamecomics','hivetoons','mangadistrict','manhwaclub','lilymanga','mangaworld','mangaworldadult','rawkuma','tcbscans','lnori','scythescans','reimanga','cocomic','manhwatoon','samuraiscan','mangaberri','mangacherri','chikari','rinkocomics','rokaricomics','scansgg','dankefurslesen','thunderscans','mangakatana','mangademon','vortexscans','hijala','manhwanex','atsumaru'];
 const KEEP = new Set(ORDER);
 const EXTENDED = new Set<string>([]);
-const TESTING = new Set<string>(['readcomicsonline-ru','batcave-native3','probe-asura-reader2','probe-batcave2','probe-toocomic-reader4','probe-toocomic-reader3','probe-toocomic-reader2','probe-toocomic-reader1','probe-toocomic1','probe-sushiscan1','mangasushi','royalroad','readall-native2','toocomic-fr','punkrecords','batcave','mangapill']);
+const TESTING = new Set<string>(['batcave-native3', 'toocomic-fr', 'ocecomic-com']);
 const TESTING_PREFIXES: string[] = [];
-const DEBUG_SKIP = new Set<string>(['readcomicsonline-ru','batcave-native3','probe-asura-reader2','probe-batcave2','probe-toocomic-reader4','probe-toocomic-reader3','probe-toocomic-reader2','probe-toocomic-reader1','probe-toocomic1','probe-sushiscan1','asura-seanime','mangasushi','batcave','royalroad','readall-native2','mangapill','atsumaru','toocomic-fr','punkrecords']);
+const DEBUG_SKIP = new Set<string>(['batcave-native3', 'toocomic-fr', 'ocecomic-com']);
 const DEBUG_SKIP_PREFIXES: string[] = [];
 const SHIM_PUBLISHED = new Set<string>(['thunderscans', 'mangakatana', 'mangademon', 'vortexscans', 'atsumaru']);
 const ATSUMARU_COVER_RE = /(\w+)(\??\.)mediumImage\?\?\1\2smallImage\?\?\1\2image/g;
@@ -43,9 +43,6 @@ function loadGuardTail(id: string, name: string): string {
     '\n}\n'
   );
 }
-
-TESTING.add('probe-batcave1');
-DEBUG_SKIP.add('probe-batcave1');
 
 const repoPath = path.join(DIST, 'repo.json');
 const repo = JSON.parse(fs.readFileSync(repoPath, 'utf-8'));
