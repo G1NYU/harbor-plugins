@@ -1,0 +1,10 @@
+{
+  "id": "batcave-native3",
+  "name": "BatCave Native v3 (WebView test)",
+  "version": "0.3.0",
+  "lang": "en",
+  "nsfw": false,
+  "entry": "batcave-native3.plugin.js",
+  "description": "Native BatCave reader in testing. Requires user-initiated WebView session in RE-Harbor patch; experimental and unverified end to end.",
+  "website": "https://batcave.biz/"
+}
