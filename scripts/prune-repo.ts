@@ -3,7 +3,7 @@ import path from 'node:path';
 
 const DIST = path.join(process.cwd(), 'dist', 'manga');
 
-const ORDER = ['asura-seanime','legion-scans','weebcentral','kaynscan','projectsuki','mangadex','nhentai','mgeko','kingofshojo','manhuaplus','flamecomics','hivetoons','mangadistrict','manhwaclub','lilymanga','mangaworld','mangaworldadult','rawkuma','tcbscans','lnori','scythescans','reimanga','cocomic','manhwatoon','samuraiscan','mangaberri','mangacherri','chikari','rinkocomics','rokaricomics','scansgg','dankefurslesen','thunderscans','mangakatana','mangademon','vortexscans','hijala','manhwanex','atsumaru'];
+const ORDER = ['asura-seanime-v2','asura-seanime','legion-scans','weebcentral','kaynscan','projectsuki','mangadex','nhentai','mgeko','kingofshojo','manhuaplus','flamecomics','hivetoons','mangadistrict','manhwaclub','lilymanga','mangaworld','mangaworldadult','rawkuma','tcbscans','lnori','scythescans','reimanga','cocomic','manhwatoon','samuraiscan','mangaberri','mangacherri','chikari','rinkocomics','rokaricomics','scansgg','dankefurslesen','thunderscans','mangakatana','mangademon','vortexscans','hijala','manhwanex','atsumaru'];
 const KEEP = new Set(ORDER);
 const EXTENDED = new Set<string>([]);
 const TESTING = new Set<string>(['probe-asura-reader2','probe-batcave2','probe-toocomic-reader4','probe-toocomic-reader3','probe-toocomic-reader2','probe-toocomic-reader1','probe-toocomic1','probe-sushiscan1','mangasushi','royalroad','readall-native2','toocomic-fr','punkrecords','batcave','mangapill']);
