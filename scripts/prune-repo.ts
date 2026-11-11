@@ -3,12 +3,12 @@ import path from 'node:path';
 
 const DIST = path.join(process.cwd(), 'dist', 'manga');
 
-const ORDER = ['asura-seanime-v2','asura-seanime','legion-scans','readcomicsonline-ru','ocecomic-com','weebcentral','kaynscan','projectsuki','mangadex','nhentai','mgeko','kingofshojo','manhuaplus','flamecomics','hivetoons','mangadistrict','manhwaclub','lilymanga','mangaworld','mangaworldadult','rawkuma','tcbscans','lnori','scythescans','reimanga','cocomic','manhwatoon','samuraiscan','mangaberri','mangacherri','chikari','rinkocomics','rokaricomics','scansgg','dankefurslesen','thunderscans','mangakatana','mangademon','vortexscans','hijala','manhwanex','atsumaru'];
+const ORDER = ['asura-seanime-v2','asura-seanime','legion-scans','readcomicsonline-ru','ocecomic-com','latestcomics-en','weebcentral','kaynscan','projectsuki','mangadex','nhentai','mgeko','kingofshojo','manhuaplus','flamecomics','hivetoons','mangadistrict','manhwaclub','lilymanga','mangaworld','mangaworldadult','rawkuma','tcbscans','lnori','scythescans','reimanga','cocomic','manhwatoon','samuraiscan','mangaberri','mangacherri','chikari','rinkocomics','rokaricomics','scansgg','dankefurslesen','thunderscans','mangakatana','mangademon','vortexscans','hijala','manhwanex','atsumaru'];
 const KEEP = new Set(ORDER);
 const EXTENDED = new Set<string>([]);
-const TESTING = new Set<string>(['batcave-native3', 'toocomic-fr', 'latestcomics-en']);
+const TESTING = new Set<string>(['batcave-native3', 'toocomic-fr']);
 const TESTING_PREFIXES: string[] = [];
-const DEBUG_SKIP = new Set<string>(['batcave-native3', 'toocomic-fr', 'latestcomics-en']);
+const DEBUG_SKIP = new Set<string>(['batcave-native3', 'toocomic-fr']);
 const DEBUG_SKIP_PREFIXES: string[] = [];
 const SHIM_PUBLISHED = new Set<string>(['thunderscans', 'mangakatana', 'mangademon', 'vortexscans', 'atsumaru']);
 const ATSUMARU_COVER_RE = /(\w+)(\??\.)mediumImage\?\?\1\2smallImage\?\?\1\2image/g;
