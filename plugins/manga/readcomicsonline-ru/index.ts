@@ -1,5 +1,5 @@
 /**
- * Read Comics Online — native Harbor comics source (experimental).
+ * Read Comics Online — native Harbor comics source.
  *
  * Server-rendered comic listing, issue selection and #reader-all image URLs.
  * Based on an actual page source supplied by a user (33 / 33 issue pages).
@@ -205,24 +205,40 @@ function hasChallenge(body: string): boolean {
 }
 async function getHtml(path: string): Promise<string> {
   const url = BASE + path;
-  const response = await harbor.http(url, {
-    method: 'GET', responseType: 'text', timeoutMs: 12000,
-    headers: { Accept: 'text/html,application/xhtml+xml,*/*' },
-  });
-  const status = Number(response?.status || 0);
-  const body = String(response?.body || '');
-  if (status !== 200 || hasChallenge(body)) {
-    if (status === 403 || hasChallenge(body)) {
-      throw new Error('Read Comics Online returned HTTP ' + status +
-        ' / anti-bot challenge at ' + path + '. Harbor browser session may be required.');
+  let lastError: Error | null = null;
+  // Retry a single transient request failure. Do not retry anti-bot challenges:
+  // they require an actual browser session and will not be solved here.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await harbor.http(url, {
+        method: 'GET', responseType: 'text', timeoutMs: 12000,
+        headers: { Accept: 'text/html,application/xhtml+xml,*/*' },
+      });
+      const status = Number(response?.status || 0);
+      const body = String(response?.body || '');
+      if (status === 403 || hasChallenge(body)) {
+        throw new Error('Read Comics Online returned HTTP ' + status +
+          ' / anti-bot challenge at ' + path + '. Harbor browser session may be required.');
+      }
+      if (status !== 200) {
+        if (attempt === 0 && (status === 0 || status === 429 || status >= 500)) continue;
+        throw new Error('Read Comics Online HTTP ' + status + ' at ' + path);
+      }
+      if (!/<html\b/i.test(body)) {
+        if (attempt === 0) continue;
+        throw new Error('Read Comics Online returned non-HTML content at ' + path);
+      }
+      return body;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (/anti-bot challenge|HTTP 40[134]|HTTP 404/i.test(lastError.message) || attempt > 0) {
+        throw lastError;
+      }
     }
-    throw new Error('Read Comics Online HTTP ' + status + ' at ' + path);
   }
-  if (!body.includes('<html') && !body.includes('<HTML')) {
-    throw new Error('Read Comics Online returned non-HTML content at ' + path);
-  }
-  return body;
+  throw lastError || new Error('Read Comics Online request failed at ' + path);
 }
+
 function extractYear(title: string): number | undefined {
   const m = /\((20\d\d|19\d\d)(?:-|\))/.exec(title);
   return m ? Number(m[1]) : undefined;
@@ -275,26 +291,31 @@ const plugin: MangaProvider = {
     const m = /^([a-z0-9][a-z0-9-]*)\/([a-z0-9][a-z0-9._-]*)$/i.exec(chapterId);
     if (!m) return [];
     const [, slug, issue] = m;
-    let html = await getHtml('/comic/' + slug + '/' + issue);
-    let pages = parsePages(html, slug, issue);
-    if (!pages.length) {
-      // The confirmed source HTML uses /issue/page and embeds the full issue.
-      html = await getHtml('/comic/' + slug + '/' + issue + '/1');
-      pages = parsePages(html, slug, issue);
+    const basePath = '/comic/' + slug + '/' + issue;
+    let lastProblem = '';
+    // Both URLs are seen in the wild. Also try the secondary URL if the
+    // primary HTTP request fails, not just when it contains zero images.
+    for (const path of [basePath, basePath + '/1']) {
+      try {
+        const html = await getHtml(path);
+        const pages = parsePages(html, slug, issue);
+        const expected = /Page\s+\d+\s*\/\s*(\d+)/i.exec(html)?.[1];
+        if (pages.length && (!expected || Number(expected) <= pages.length)) {
+          return pages;
+        }
+        const sectionPresent = /\bid\s*=\s*["']reader-all["']/i.test(html);
+        const imageTags = (html.match(/<img\b/gi) || []).length;
+        lastProblem = pages.length
+          ? 'partial reader: ' + pages.length + ' of ' + expected + ' pages'
+          : (sectionPresent ? 'reader present' : 'no full-page reader') +
+            ', HTML images: ' + imageTags;
+      } catch (error) {
+        lastProblem = error instanceof Error ? error.message : String(error);
+        if (/anti-bot challenge/.test(lastProblem)) throw error;
+      }
     }
-    if (!pages.length) {
-      const sectionPresent = /\bid\s*=\s*["']reader-all["']/i.test(html);
-      const imageTags = (html.match(/<img\b/gi) || []).length;
-      throw new Error('Issue #' + issue + ' has no usable comic pages (' +
-        (sectionPresent ? 'reader present' : 'no full-page reader') +
-        ', HTML images: ' + imageTags +
-        '). The issue may be missing images or using a different CDN layout.');
-    }
-    const expected = /Page\s+\d+\s*\/\s*(\d+)/i.exec(html)?.[1];
-    if (expected && Number(expected) > pages.length) {
-      throw new Error('Partial reader result: ' + pages.length + ' of ' + expected + ' pages for ' + chapterId);
-    }
-    return pages;
+    throw new Error('Issue #' + issue + ' could not load (' + lastProblem +
+      '). Check whether the original website loads this issue reliably.');
   },
 };
 
