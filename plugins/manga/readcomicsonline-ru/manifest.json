@@ -1,0 +1,10 @@
+{
+  "id": "readcomicsonline-ru",
+  "name": "Read Comics Online",
+  "version": "0.1.0",
+  "lang": "en",
+  "nsfw": false,
+  "entry": "readcomicsonline-ru.plugin.js",
+  "description": "Experimental English / Western comics source for Harbor. Server-rendered HTML chapters and CDN images; test network access first.",
+  "website": "https://readcomicsonline.ru/"
+}
