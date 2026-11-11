@@ -162,10 +162,62 @@
     }
   }
 
+  const COMIC_SOURCES = new Set(['readcomicsonline-ru', 'ocecomic-com', 'latestcomics-en', 'toocomic-fr']);
+  // Verified in Harbor by the repo owner, separate from automated health reports.
+  const HARBOR_TESTED = new Set(['readcomicsonline-ru', 'ocecomic-com', 'latestcomics-en', 'toocomic-fr']);
+  const LANGUAGE_NAMES = {
+    en: 'English', fr: 'Français', es: 'Español', it: 'Italiano',
+    ja: '日本語', multi: 'Multilingual', pt: 'Português', ar: 'العربية',
+    ko: '한국어', de: 'Deutsch'
+  };
+  const LANGUAGE_ORDER = ['en', 'fr', 'es', 'it', 'ja', 'multi'];
+
+  function normalLang(lang) {
+    const code = String(lang || 'en').trim().toLowerCase();
+    return code === 'jp' ? 'ja' : code;
+  }
+  function languageName(lang) {
+    const code = normalLang(lang);
+    return LANGUAGE_NAMES[code] || code.toUpperCase();
+  }
+  function verifiedSource(p) {
+    return HARBOR_TESTED.has(p.id) || (p.badges || []).includes('Verified');
+  }
+
   let allPlugins = [];
   let healthReports = {};
   let currentFilter = 'all';
+  let currentLanguage = 'all';
   let searchQuery = '';
+
+  function renderLanguageChips() {
+    const wrapper = document.getElementById('language-chips');
+    wrapper.replaceChildren();
+    const counts = new Map();
+    for (const source of allPlugins) {
+      const lang = normalLang(source.lang);
+      counts.set(lang, (counts.get(lang) || 0) + 1);
+    }
+    const languages = [...counts.keys()].sort((a, b) => {
+      const rankA = LANGUAGE_ORDER.indexOf(a);
+      const rankB = LANGUAGE_ORDER.indexOf(b);
+      return (rankA < 0 ? 100 : rankA) - (rankB < 0 ? 100 : rankB) || a.localeCompare(b);
+    });
+    for (const lang of ['all', ...languages]) {
+      const count = lang === 'all' ? allPlugins.length : counts.get(lang);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'chip-btn language-chip' + (currentLanguage === lang ? ' active' : '');
+      button.setAttribute('aria-pressed', String(currentLanguage === lang));
+      button.textContent = (lang === 'all' ? 'All languages' : languageName(lang)) + ' · ' + count;
+      button.addEventListener('click', () => {
+        currentLanguage = lang;
+        renderLanguageChips();
+        renderCatalog();
+      });
+      wrapper.append(button);
+    }
+  }
 
   function renderCatalog() {
     const container = document.getElementById('plugin-container');
@@ -174,23 +226,33 @@
     const filtered = allPlugins.filter((p) => {
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
-        const hit = (p.name || '').toLowerCase().includes(q) || (p.id || '').toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q);
+        const hit = (p.name || '').toLowerCase().includes(q) ||
+          (p.id || '').toLowerCase().includes(q) ||
+          (p.description || '').toLowerCase().includes(q) ||
+          languageName(p.lang).toLowerCase().includes(q);
         if (!hit) return false;
       }
+      if (currentLanguage !== 'all' && normalLang(p.lang) !== currentLanguage) return false;
       if (currentFilter === 'operational') {
         const h = healthReports[p.id];
-        return h && h.overallStatus === 'OPERATIONAL';
+        return verifiedSource(p) || (h && h.overallStatus === 'OPERATIONAL');
       }
-      if (currentFilter === 'verified') return (p.badges || []).includes('Verified');
+      if (currentFilter === 'verified') return verifiedSource(p);
       if (currentFilter === 'popular') return (p.badges || []).includes('Popular');
       if (currentFilter === 'manga') return p.type === 'manga';
+      if (currentFilter === 'comics') return COMIC_SOURCES.has(p.id);
       if (currentFilter === 'ebook') return p.type === 'ebook';
       if (currentFilter === 'safe') return !p.nsfw;
       if (currentFilter === 'nsfw') return p.nsfw;
       return true;
     });
 
-    stats.textContent = 'SHOWING ' + filtered.length + ' / ' + allPlugins.length + ' SOURCES';
+    const mangaCount = allPlugins.filter((p) => p.type === 'manga').length;
+    const ebookCount = allPlugins.filter((p) => p.type === 'ebook').length;
+    const comicsCount = allPlugins.filter((p) => COMIC_SOURCES.has(p.id)).length;
+    stats.textContent = 'SHOWING ' + filtered.length + ' / ' + allPlugins.length +
+      ' SOURCES · ' + mangaCount + ' MANGA / COMICS · ' + ebookCount +
+      ' EBOOK · ' + comicsCount + ' COMIC-FRIENDLY';
 
     if (filtered.length === 0) {
       container.innerHTML = '<div class="empty">No matching plugins found.</div>';
@@ -198,9 +260,11 @@
     }
 
     container.innerHTML = filtered.map((p) => {
-      const isVerified = (p.badges || []).includes('Verified');
+      const isVerified = verifiedSource(p);
       const isPopular = (p.badges || []).includes('Popular');
-      const health = healthReports[p.id];
+      // An old health-report result must not contradict a fresh user-tested source.
+      const health = HARBOR_TESTED.has(p.id) ? null : healthReports[p.id];
+      const isComic = COMIC_SOURCES.has(p.id);
 
       let healthBadge = '';
       if (health) {
@@ -219,10 +283,11 @@
         '<div class="plugin-item-header"><h3>' + esc(p.name) + '</h3><span class="plugin-version">v' + esc(p.version) + '</span></div>' +
         '<p>' + esc(p.description || 'No description provided.') + '</p>' +
         '<div class="badges">' +
-          '<span class="badge ' + (p.type === 'manga' ? 'tag-manga' : 'tag-ebook') + '">' + esc(p.type) + '</span>' +
-          '<span class="badge">' + esc(p.lang || 'en') + '</span>' +
+          '<span class="badge ' + (p.type === 'manga' ? 'tag-manga' : 'tag-ebook') + '">' +
+            esc(isComic ? 'Comics / manga' : p.type) + '</span>' +
+          '<span class="badge">' + esc(languageName(p.lang)) + '</span>' +
           healthBadge +
-          (isVerified ? '<span class="badge badge-verified">Verified</span>' : '') +
+          (isVerified ? '<span class="badge badge-verified" title="Tested in Harbor">Verified</span>' : '') +
           (isPopular ? '<span class="badge badge-popular">Popular</span>' : '') +
           (p.nsfw ? '<span class="badge badge-nsfw">18+</span>' : '') +
         '</div></div>';
@@ -269,6 +334,7 @@
       }
     } catch (_) {}
 
+    renderLanguageChips();
     renderCatalog();
   }
 
