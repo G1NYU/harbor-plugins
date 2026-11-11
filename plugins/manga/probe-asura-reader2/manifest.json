@@ -1,0 +1,10 @@
+{
+  "id": "probe-asura-reader2",
+  "name": "Probe Asura Reader v2",
+  "version": "0.0.1",
+  "lang": "en",
+  "nsfw": false,
+  "entry": "probe-asura-reader2.plugin.js",
+  "description": "Testing only: ChapterReader and HTML image extraction; CDN image and API diagnostics. Search 'image' or 'api'.",
+  "website": "https://asurascans.com"
+}

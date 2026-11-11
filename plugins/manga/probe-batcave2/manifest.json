@@ -1,0 +1,10 @@
+{
+  "id": "probe-batcave2",
+  "name": "Probe BatCave v2",
+  "version": "0.0.1",
+  "lang": "en",
+  "nsfw": false,
+  "entry": "probe-batcave2.plugin.js",
+  "description": "Testing only: dynamic chapter API and image diagnostics without expired hardcoded image URLs. Search reader, api, or image.",
+  "website": "https://batcave.biz"
+}
