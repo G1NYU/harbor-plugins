@@ -171,7 +171,7 @@ const plugin: MangaProvider = {
     catch { html = await get('/comic/' + series + '/1'); }
     const slug = id.includes('/') ? id.split('/')[1] : 'Comic ' + series;
     const title = titleFromHtml(html, human(slug));
-    const cover = pageUrl(meta(html, 'og:image')) || pageUrl(/<figure\b[^>]*>\s*<img\b[^>]*>/i.exec(html)?.[0] || '') || undefined;
+    const cover = pageUrl(meta(html, 'og:image')) || pageUrl(attr(/<img\b[^>]*>/i.exec(html)?.[0] || '', 'src')) || undefined;
     const description = clean(meta(html, 'og:description') || meta(html, 'description'));
     return { id, title, cover, description: description || undefined };
   },
