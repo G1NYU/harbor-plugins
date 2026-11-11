@@ -84,9 +84,11 @@ function innerDiv(html: string, opener: RegExp): string {
 function firstImage(html: string): string | undefined {
   const match = /<img\b[^>]*>/i.exec(html)?.[0] || '';
   const value = attr(match, 'data-src') || attr(match, 'src');
+  if (!value) return undefined;
   try {
     const u = new URL(value, BASE);
-    return u.protocol === 'https:' && /^(?:www\.)?latestcomics\.com$/i.test(u.hostname)
+    return u.protocol === 'https:' && /^(?:www\.)?latestcomics\.com$/i.test(u.hostname) &&
+      /\.(?:jpe?g|png|webp|avif)$/i.test(u.pathname)
       ? u.href : undefined;
   } catch { return undefined; }
 }
