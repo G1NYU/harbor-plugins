@@ -84,9 +84,11 @@ function innerDiv(html: string, opener: RegExp): string {
 function firstImage(html: string): string | undefined {
   const match = /<img\b[^>]*>/i.exec(html)?.[0] || '';
   const value = attr(match, 'data-src') || attr(match, 'src');
+  if (!value) return undefined;
   try {
     const u = new URL(value, BASE);
-    return u.protocol === 'https:' && /^(?:www\.)?latestcomics\.com$/i.test(u.hostname)
+    return u.protocol === 'https:' && /^(?:www\.)?latestcomics\.com$/i.test(u.hostname) &&
+      /\.(?:jpe?g|png|webp|avif)$/i.test(u.pathname)
       ? u.href : undefined;
   } catch { return undefined; }
 }
@@ -124,20 +126,52 @@ async function request(path: string, options?: { method: string; body: string })
 async function html(path: string): Promise<string> {
   return request(path);
 }
+function catalogueCover(fragment: string): string | undefined {
+  // MangaVerse renders browse/search covers as a CSS background-image
+  // on .series-card-thumb, not as an <img>. Respect the outer style
+  // attribute's quote delimiter: url('...') appears inside style="...".
+  for (const tag of fragment.match(/<div\b[^>]*>/gi) || []) {
+    if (!attr(tag, 'class').split(/\s+/).includes('series-card-thumb')) continue;
+    const style = /\bstyle\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(tag);
+    const css = style?.[1] || style?.[2] || '';
+    const raw = /background(?:-image)?\s*:\s*url\(\s*(['"]?)(.*?)\1\s*\)/i.exec(css)?.[2];
+    if (!raw) continue;
+    try {
+      const u = new URL(decode(raw), BASE);
+      if (u.protocol === 'https:' &&
+        /^(?:www\.)?latestcomics\.com$/i.test(u.hostname) &&
+        u.pathname.startsWith('/wp-content/uploads/') &&
+        /\.(?:jpe?g|png|webp|avif)$/i.test(u.pathname)) return u.href;
+    } catch { /* Not a valid image URL */ }
+  }
+  return undefined;
+}
 function catalogue(body: string): MangaSummary[] {
   const out: MangaSummary[] = [];
   const seen = new Set<string>();
+  // The homepage contains featured "Read Now" links, and search pages
+  // contain navigation links. Parse ONLY the actual series-card grid,
+  // otherwise a titleless link gets recorded first with no cover.
+  let grid = '';
+  for (const tag of body.matchAll(/<div\b[^>]*>/gi)) {
+    if (!attr(tag[0], 'class').split(/\s+/).includes('series-grid')) continue;
+    grid = innerDiv(body.slice(tag.index), /^<div\b[^>]*>/i);
+    break;
+  }
+  if (!grid) return out;
   const anchors = /<a\b[^>]*>[\s\S]*?<\/a>/gi;
   let m: RegExpExecArray | null;
-  while ((m = anchors.exec(body))) {
+  while ((m = anchors.exec(grid))) {
     const opening = /^<a\b[^>]*>/i.exec(m[0])?.[0] || '';
+    if (!attr(opening, 'class').split(/\s+/).includes('series-card-link')) continue;
     const slug = seriesSlug(sitePath(attr(opening, 'href')));
     if (!slug || seen.has(slug)) continue;
     const content = m[0].slice(opening.length).replace(/<\/a>$/i, '');
-    const label = textOnly(attr(opening, 'title') || content);
-    const imgTag = /<img\b[^>]*>/i.exec(m[0])?.[0] || '';
-    const title = label || textOnly(attr(imgTag, 'alt')).replace(/\s+Cover Image$/i, '') || human(slug);
-    const cover = firstImage(content) || firstImage(body.slice(m.index, m.index + 550));
+    const heading = /<h[2-4]\b[^>]*\bclass\s*=\s*["'][^"']*\bseries-card-title\b[^"']*["'][^>]*>([\s\S]*?)<\/h[2-4]>/i.exec(content)?.[1] || '';
+    const imgTag = /<img\b[^>]*>/i.exec(content)?.[0] || '';
+    const title = textOnly(heading) || textOnly(attr(opening, 'title')) ||
+      textOnly(attr(imgTag, 'alt')).replace(/\s+Cover Image$/i, '') || human(slug);
+    const cover = catalogueCover(content) || firstImage(content);
     out.push({ id: slug, title, cover });
     seen.add(slug);
   }
