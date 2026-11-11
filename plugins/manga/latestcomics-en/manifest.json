@@ -1,0 +1,10 @@
+{
+  "id": "latestcomics-en",
+  "name": "LatestComics EN [TEST]",
+  "version": "0.1.0",
+  "lang": "en",
+  "nsfw": false,
+  "entry": "latestcomics-en.plugin.js",
+  "description": "Western comics source. Direct image extraction and WordPress AJAX issue pagination. Harbor live testing pending.",
+  "website": "https://www.latestcomics.com/en/"
+}
