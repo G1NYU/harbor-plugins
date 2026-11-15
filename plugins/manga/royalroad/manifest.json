@@ -1,0 +1,11 @@
+{
+  "id": "royalroad",
+  "name": "RoyalRoad (Native test)",
+  "version": "1.1.0",
+  "lang": "en",
+  "nsfw": false,
+  "icon": "https://www.royalroad.com/icons/favicon-32x32.png",
+  "entry": "royalroad.plugin.js",
+  "description": "Native Royal Road test: browse, search, covers and chapter lists; prose reading requires future Manga reader support. Use the eBook extension for reading.",
+  "website": "https://www.royalroad.com"
+}
