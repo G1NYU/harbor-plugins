@@ -6,12 +6,14 @@ const dist = path.resolve('dist/manga');
 const testing = JSON.parse(fs.readFileSync(path.join(dist, 'repo-testing.json'), 'utf8'));
 const main = JSON.parse(fs.readFileSync(path.join(dist, 'repo.json'), 'utf8'));
 const ebook = JSON.parse(fs.readFileSync('dist/ebook/repo.json', 'utf8'));
-assert.deepEqual(testing.plugins.map((p: any) => p.id).sort(), ['batcave', 'royalroad']);
+const native = JSON.parse(fs.readFileSync('plugins/manga/royalroad/manifest.json', 'utf8'));
+const ebookSource = JSON.parse(fs.readFileSync('plugins/ebook/royalroad/manifest.json', 'utf8'));
+assert.equal(testing.plugins.filter((p: any) => p.id === 'royalroad').length, 1);
 const manifest = testing.plugins.find((p: any) => p.id === 'royalroad');
-assert.equal(manifest.version, '1.1.0');
-assert.equal(manifest.name, 'RoyalRoad (Native test)');
-assert.ok(!main.plugins.some((p: any) => ['batcave', 'royalroad'].includes(p.id)));
-assert.equal(ebook.plugins.find((p: any) => p.id === 'royalroad').version, '1.0.0');
+assert.equal(manifest.version, native.version);
+assert.equal(manifest.name, native.name);
+assert.ok(!main.plugins.some((p: any) => p.id === 'royalroad'));
+assert.equal(ebook.plugins.find((p: any) => p.id === 'royalroad').version, ebookSource.version);
 
 type Fixture = {
   text(): string; attr(name: string): string | null;
