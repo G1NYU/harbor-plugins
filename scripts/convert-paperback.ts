@@ -159,6 +159,12 @@ async function main() {
       upstreamStatus.push({ name: upName, ok: true, count: versioning.sources.length });
       for (const s of versioning.sources) {
         const pid = toPluginId(s.id);
+        // RoyalRoad is now a native Manga provider. Do not overwrite the
+        // same-ID bundle with the upstream Paperback conversion.
+        if (pid === 'royalroad' && fs.existsSync(path.join(PLUGINS_MANGA_DIR, 'royalroad', 'manifest.json'))) {
+          console.log('  Keeping native RoyalRoad instead of upstream conversion');
+          continue;
+        }
         if (seen.has(pid)) continue;
         seen.add(pid);
         queue.push({ source: s, rawBaseUrl: up.rawBaseUrl });

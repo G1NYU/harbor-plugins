@@ -10,7 +10,7 @@
     "sync-upstream": "tsx scripts/build.ts && tsx scripts/convert-paperback.ts && tsx scripts/release-ebooks.ts && tsx scripts/validate.ts",
     "gate": "tsx scripts/update-gate.ts",
     "trial-report": "tsx scripts/trial-report.ts",
-    "validate": "tsx scripts/validate.ts",
+    "validate": "tsx scripts/validate.ts && tsx scripts/test-royalroad-native.ts",
     "typecheck": "tsc --noEmit",
     "serve": "tsx scripts/serve.ts",
     "test:extensions": "tsx scripts/test-extensions.ts",
