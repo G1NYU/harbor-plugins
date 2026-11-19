@@ -106,3 +106,11 @@ Not part of the current eBook phase. Do only if the user asks.
 - Main source list: only Asura v2 remains listed. The older Asura v1, ReiManga, and Scans.GG are retained in Testing for investigation, not deleted.
 - External observations: Asura site and chapter images respond; ReiManga JSON metadata endpoints respond but chapter pages are bot-protected; Scans.GG website/API were unreachable at time of inspection.
 - Verification still required before claiming repaired: CI typecheck/build/validate and live Harbor browse, cover, chapter-list and reader tests after deploy. Move ReiManga or Scans.GG back to Main only after these checks pass.
+
+## Atsumaru / Asura follow-up candidate (2026-11-19)
+
+- Replaced Paperback Atsumaru conversion with same-ID native Harbor adapter based on directly observed site JSON endpoints. Search, cover metadata, 701 Naruto chapters, and 51 reader-page URLs were externally observed.
+- Native adapter's offline fixture regression tests pass; real Harbor CDN images and playback are **not** yet verified. The Paperback converter skips the same-ID native plugin; obsolete shim removed.
+- Asura upstream Seanime 1.1.3 fixes are selectively ported (desktop navigation headers, absolute ID normalization, escaped chapter links). Asura v2 is moved from Main to Testing, with v1 retained there. Cloudflare/WebView access may still block chapters.
+- ReiManga and Scans.GG remain Testing; no change.
+- Do not promote Asura to Main until an actual Harbor chapter list and reader image sequence work.

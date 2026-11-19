@@ -3,16 +3,14 @@ import path from 'node:path';
 
 const DIST = path.join(process.cwd(), 'dist', 'manga');
 
-const ORDER = ['asura-seanime-v2','legion-scans','readcomicsonline-ru','batcave','ocecomic-com','latestcomics-en','toocomic-fr','weebcentral','kaynscan','projectsuki','nhentai','mgeko','kingofshojo','manhuaplus','flamecomics','hivetoons','mangadistrict','manhwaclub','lilymanga','mangaworld','mangaworldadult','rawkuma','tcbscans','lnori','scythescans','cocomic','manhwatoon','samuraiscan','mangaberri','mangacherri','chikari','rinkocomics','rokaricomics','dankefurslesen','thunderscans','mangakatana','mangademon','vortexscans','hijala','manhwanex','atsumaru'];
+const ORDER = ['legion-scans','readcomicsonline-ru','batcave','ocecomic-com','latestcomics-en','toocomic-fr','weebcentral','kaynscan','projectsuki','nhentai','mgeko','kingofshojo','manhuaplus','flamecomics','hivetoons','mangadistrict','manhwaclub','lilymanga','mangaworld','mangaworldadult','rawkuma','tcbscans','lnori','scythescans','cocomic','manhwatoon','samuraiscan','mangaberri','mangacherri','chikari','rinkocomics','rokaricomics','dankefurslesen','thunderscans','mangakatana','mangademon','vortexscans','hijala','manhwanex','atsumaru'];
 const KEEP = new Set(ORDER);
 const EXTENDED = new Set<string>([]);
-const TESTING = new Set<string>(['batcave', 'asura-seanime', 'reimanga', 'scansgg']);
+const TESTING = new Set<string>(['batcave', 'asura-seanime', 'asura-seanime-v2', 'reimanga', 'scansgg']);
 const TESTING_PREFIXES: string[] = [];
 const DEBUG_SKIP = new Set<string>(['batcave']);
 const DEBUG_SKIP_PREFIXES: string[] = [];
-const SHIM_PUBLISHED = new Set<string>(['thunderscans', 'mangakatana', 'mangademon', 'vortexscans', 'atsumaru']);
-const ATSUMARU_COVER_RE = /(\w+)(\??\.)mediumImage\?\?\1\2smallImage\?\?\1\2image/g;
-const ATSUMARU_COVER_REPLACE = '$1$2image??$1$2mediumImage??$1$2smallImage';
+const SHIM_PUBLISHED = new Set<string>(['thunderscans', 'mangakatana', 'mangademon', 'vortexscans']);
 const EXEC_FIND = 'const __executeUpstream = (Application) => {';
 const EXEC_REPLACE = [
   'const __realG = (typeof globalThis === "object" && globalThis) ? globalThis : null;',
@@ -81,12 +79,6 @@ for (const p of kept) {
     } else {
       console.warn(`  Warning: ${p.entry} has no executeUpstream marker; globalThis shim skipped`);
     }
-  }
-  if (idOf(p) === 'atsumaru') {
-    const fixed = code.replace(ATSUMARU_COVER_RE, ATSUMARU_COVER_REPLACE);
-    if (fixed === code) console.warn('  Warning: Atsumaru cover pattern not found; covers unchanged');
-    code = fixed;
-    p.version = `${p.version}.1`;
   }
   if (code !== original) fs.writeFileSync(f, code, 'utf-8');
 }

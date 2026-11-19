@@ -1,10 +1,10 @@
 {
   "id": "asura-seanime-v2",
   "name": "★ Asura Scans v2",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "lang": "en",
   "nsfw": false,
   "entry": "asura-seanime-v2.plugin.js",
-  "description": "Asura Scans native Harbor provider with improved ChapterReader parsing and verified rendered-image fallback. Original Asura source kept as backup while v2 is tested.",
+  "description": "Experimental Seanime-derived provider. Attempted chapter URL and request-header repairs; requires full Harbor reader verification before return to Main.",
   "website": "https://asurascans.com"
 }

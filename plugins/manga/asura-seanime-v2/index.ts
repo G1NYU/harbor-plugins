@@ -34,9 +34,9 @@ import type { MangaChapter, MangaProvider, MangaSummary } from '@shared/types/ma
 const API = 'https://asurascans.com';
 const HEADERS: Record<string, string> = {
   'User-Agent':
-    'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36',
-  Accept: '*/*',
-  Referer: API,
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  Referer: API + '/',
 };
 
 let lastMsg = '';
@@ -98,6 +98,19 @@ function absUrl(u: any): string | undefined {
   if (u.startsWith('//')) return 'https:' + u;
   if (u.startsWith('/')) return API + u;
   return /^https?:\/\//i.test(u) ? u : undefined;
+}
+
+// Seanime 1.1.3 accepts absolute and root-relative series IDs. Avoid a double host.
+function siteUrl(id: string): string {
+  const value = String(id || '').trim();
+  if (/^https?:\/\//i.test(value)) {
+    if (!/^https:\/\/(?:www\.)?asurascans\.com\/comics\//i.test(value)) {
+      throw new Error('Invalid Asura series URL');
+    }
+    return value;
+  }
+  if (!/^\/?comics\//i.test(value)) throw new Error('Invalid Asura series path');
+  return API + (value.startsWith('/') ? '' : '/') + value;
 }
 
 // Some Asura builds server-render their catalogue without initialSeries props.
@@ -234,7 +247,7 @@ const plugin: MangaProvider = {
   async detail(id: string) {
     if (id.indexOf('err-') === 0) return { id, title: lastMsg.slice(0, 120), description: lastMsg } as MangaSummary;
     try {
-      const html = await getHtml(API + id);
+      const html = await getHtml(siteUrl(id));
       const slug = id.split('/').filter(Boolean).pop() || id;
       return {
         id,
@@ -251,12 +264,15 @@ const plugin: MangaProvider = {
   async chapters(id: string) {
     if (id.indexOf('err-') === 0) return [];
     try {
-      const html = await getHtml(API + id);
+      const html = await getHtml(siteUrl(id));
+      // Accept HTML entities and escaped attributes as in upstream Seanime 1.1.3.
+      const normalizedHtml = html.replace(/&quot;/gi, '"').replace(/&#x27;|&#39;/gi, "'")
+        .replace(/&amp;/gi, '&').replace(/\\(["'])/g, '$1');
       const re = /<a\b[^>]*\bhref\s*=\s*(["'])([^"']+)\1/gi;
       const seen: Record<string, boolean> = {};
       const out: MangaChapter[] = [];
       let m: RegExpExecArray | null;
-      while ((m = re.exec(html)) !== null) {
+      while ((m = re.exec(normalizedHtml)) !== null) {
         const href = decodeEntities(m[2]).replace(/^https?:\/\/(?:www\.)?asurascans\.com/i, '').split(/[?#]/)[0];
         const found = /^\/comics\/[^/]+\/chapter\/([^/]+)\/?$/.exec(href);
         if (!found) continue;
@@ -275,7 +291,7 @@ const plugin: MangaProvider = {
 
   async pageUrls(chapterId: string) {
     if (chapterId.indexOf('::debug') >= 0) return [];
-    const url = /^https?:\/\//i.test(chapterId) ? chapterId : API + chapterId;
+    const url = siteUrl(chapterId);
     const html = await getHtml(url);
     // Verified in Harbor diagnostics on 11 Nov 2026:
     // 44 page URLs from island AND image tags, image/webp fetched with HTTP 200.
