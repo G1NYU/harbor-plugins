@@ -99,3 +99,10 @@ Not part of the current eBook phase. Do only if the user asks.
 - `shared/types/harbor.d.ts`: the host bridge as Harbor documents it. `shared/types/manga.ts`: the plugin interface. `shared/types/ebook.ts`: Harbor also has an eBook plugin type.
 - `public/index.html`: the Pages site; its Known issues card is updated.
 - Best templates for a new native plugin: `plugins/manga/asura-seanime/index.ts` (data embedded in the page) and `plugins/manga/legion-es/index.ts` (WordPress theme scraped with regex).
+
+## Manga source reliability (2026-11-19)
+
+- Asura v2: catalogue Astro attributes are parsed independent of attribute order and hydration mode, with a rendered-anchor fallback; chapter links accept absolute/relative URLs and quote styles. Version bumped to 0.2.1. `npx tsx scripts/test-asura-html.mjs` covers fixtures.
+- Main source list: only Asura v2 remains listed. The older Asura v1, ReiManga, and Scans.GG are retained in Testing for investigation, not deleted.
+- External observations: Asura site and chapter images respond; ReiManga JSON metadata endpoints respond but chapter pages are bot-protected; Scans.GG website/API were unreachable at time of inspection.
+- Verification still required before claiming repaired: CI typecheck/build/validate and live Harbor browse, cover, chapter-list and reader tests after deploy. Move ReiManga or Scans.GG back to Main only after these checks pass.

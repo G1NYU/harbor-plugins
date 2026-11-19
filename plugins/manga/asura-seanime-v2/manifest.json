@@ -1,7 +1,7 @@
 {
   "id": "asura-seanime-v2",
   "name": "★ Asura Scans v2",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "lang": "en",
   "nsfw": false,
   "entry": "asura-seanime-v2.plugin.js",

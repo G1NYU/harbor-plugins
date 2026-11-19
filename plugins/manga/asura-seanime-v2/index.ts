@@ -72,16 +72,15 @@ function decodeEntities(s: string): string {
 
 // Extract and parse the props JSON of a named astro-island component.
 function astroProps(html: string, component: string): any {
-  const re = new RegExp(
-    'component-export="default"[^>]*props="([^"]+)"[^>]*ssr[^>]*client="load"[^>]*opts="[^"]*' + component,
-  );
-  const m = re.exec(html);
-  if (!m) return null;
-  try {
-    return JSON.parse(decodeEntities(m[1]));
-  } catch (_) {
-    return null;
+  // Astro does not guarantee attribute order, SSR flags, or a fixed client directive.
+  for (const tag of html.match(/<astro-island\b[^>]*>/gi) || []) {
+    const identity = readerAttr(tag, 'component-url') + ' ' + readerAttr(tag, 'opts');
+    if (!identity.includes(component)) continue;
+    try {
+      return JSON.parse(readerAttr(tag, 'props'));
+    } catch (_) { /* Try the next island. */ }
   }
+  return null;
 }
 
 // Astro encodes values as [type, value]: type 0 = scalar, type 1 = array.
@@ -101,26 +100,51 @@ function absUrl(u: any): string | undefined {
   return /^https?:\/\//i.test(u) ? u : undefined;
 }
 
+// Some Asura builds server-render their catalogue without initialSeries props.
+// Read only series links, not the site's unrelated navigation and recommendations.
+function seriesFromLinks(html: string): MangaSummary[] {
+  const out = new Map<string, MangaSummary>();
+  const re = /<a\b[^>]*>[\s\S]*?<\/a>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(html)) !== null) {
+    const open = /^<a\b[^>]*>/i.exec(match[0])?.[0] || '';
+    const rawHref = readerAttr(open, 'href');
+    const id = rawHref.replace(/^https?:\/\/(?:www\.)?asurascans\.com/i, '').split(/[?#]/)[0];
+    if (!/^\/comics\/[^/]+\/?$/.test(id)) continue;
+    const img = /<img\b[^>]*>/i.exec(match[0])?.[0] || '';
+    const heading = /<h[2-4]\b[^>]*>([\s\S]*?)<\/h[2-4]>/i.exec(match[0]);
+    const title = decodeEntities((heading?.[1] || readerAttr(img, 'alt') || '')
+      .replace(/<[^>]*>/g, '').trim()) || id.split('/').filter(Boolean).pop() || id;
+    const srcset = readerAttr(img, 'srcset').split(',')[0].trim().split(/\s+/)[0];
+    const cover = [readerAttr(img, 'data-src'), readerAttr(img, 'src'), srcset]
+      .map(absUrl).find(Boolean);
+    const existing = out.get(id);
+    if (!existing) out.set(id, { id, title, cover });
+    else out.set(id, { id, title: existing.title || title, cover: existing.cover || cover });
+  }
+  return [...out.values()];
+}
+
 function parseSeries(html: string): MangaSummary[] | null {
   const props = astroProps(html, 'BrowseFilters');
-  if (!props) return null;
-  const list = props['initialSeries'];
-  if (!Array.isArray(list) || list[0] !== 1 || !Array.isArray(list[1])) return [];
+  const list = astroVal(props?.['initialSeries']);
   const out: MangaSummary[] = [];
-  for (const entry of list[1]) {
-    if (!Array.isArray(entry) || entry[0] !== 0) continue;
-    const s = entry[1] || {};
-    const slug = astroVal(s['slug']);
-    if (!slug) continue;
-    const title = astroVal(s['title']);
-    const publicUrl = astroVal(s['public_url']);
-    out.push({
-      id: String(publicUrl || '/comics/' + slug),
-      title: String(title || slug),
-      cover: absUrl(astroVal(s['cover'])),
-    });
+  if (Array.isArray(list)) {
+    for (const entry of list) {
+      const s = astroVal(entry);
+      if (!s || typeof s !== 'object') continue;
+      const slug = astroVal(s['slug']);
+      if (!slug) continue;
+      const title = astroVal(s['title']);
+      const publicUrl = astroVal(s['public_url']);
+      const rawId = String(publicUrl || '/comics/' + slug);
+      const id = rawId.replace(/^https?:\/\/(?:www\.)?asurascans\.com/i, '');
+      out.push({ id, title: String(title || slug), cover: absUrl(astroVal(s['cover'])) });
+    }
   }
-  return out;
+  if (out.length) return out;
+  const linked = seriesFromLinks(html);
+  return linked.length || props ? linked : null;
 }
 
 async function list(url: string, label: string): Promise<MangaSummary[]> {
@@ -228,15 +252,18 @@ const plugin: MangaProvider = {
     if (id.indexOf('err-') === 0) return [];
     try {
       const html = await getHtml(API + id);
-      const re = /href="(\/comics\/[^"]+\/chapter\/([^"]+))"/gi;
+      const re = /<a\b[^>]*\bhref\s*=\s*(["'])([^"']+)\1/gi;
       const seen: Record<string, boolean> = {};
       const out: MangaChapter[] = [];
       let m: RegExpExecArray | null;
       while ((m = re.exec(html)) !== null) {
-        const num = m[2];
+        const href = decodeEntities(m[2]).replace(/^https?:\/\/(?:www\.)?asurascans\.com/i, '').split(/[?#]/)[0];
+        const found = /^\/comics\/[^/]+\/chapter\/([^/]+)\/?$/.exec(href);
+        if (!found) continue;
+        const num = found[1];
         if (seen[num]) continue;
         seen[num] = true;
-        out.push({ id: m[1], chapter: num, title: 'Chapter ' + num, pages: 0, language: 'en' });
+        out.push({ id: href, chapter: num, title: 'Chapter ' + num, pages: 0, language: 'en' });
       }
       if (out.length === 0) return [debugChapter(id, 'EMPTY chapters (0 links found)')];
       out.sort((a, b) => parseFloat(String(a.chapter)) - parseFloat(String(b.chapter)));
