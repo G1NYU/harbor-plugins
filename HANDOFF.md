@@ -114,3 +114,9 @@ Not part of the current eBook phase. Do only if the user asks.
 - Asura upstream Seanime 1.1.3 fixes are selectively ported (desktop navigation headers, absolute ID normalization, escaped chapter links). Asura v2 is moved from Main to Testing, with v1 retained there. Cloudflare/WebView access may still block chapters.
 - ReiManga and Scans.GG remain Testing; no change.
 - Do not promote Asura to Main until an actual Harbor chapter list and reader image sequence work.
+
+## Asura Seanime v2 promotion (2026-11-19)
+
+- Promoted `asura-seanime-v2` to Main with manifest version 0.2.3; its provider code is unchanged from the tested 0.2.2 port.
+- The legacy `asura-seanime` provider remains in Testing. ReiManga and Scans.GG remain in Testing.
+- CI build/validation and checking live Main/Testing manifests are required before considering publication complete. Actual chapter reading inside Harbor still needs direct verification.
