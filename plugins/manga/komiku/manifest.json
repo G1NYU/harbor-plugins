@@ -1,0 +1,9 @@
+{
+  "id": "komiku-harbor",
+  "name": "Komiku (Indonesia)",
+  "version": "0.1.0",
+  "lang": "id",
+  "nsfw": false,
+  "description": "Indonesian manga, manhwa and manhua from Komiku. Native Seanime-derived Harbor port; Extended preview pending Harbor reader verification.",
+  "website": "https://komiku.org"
+}

@@ -5,7 +5,7 @@ const DIST = path.join(process.cwd(), 'dist', 'manga');
 
 const ORDER = ['asura-seanime-v2','legion-scans','readcomicsonline-ru','batcave','ocecomic-com','latestcomics-en','toocomic-fr','weebcentral','kaynscan','projectsuki','nhentai','mgeko','kingofshojo','manhuaplus','flamecomics','hivetoons','mangadistrict','manhwaclub','lilymanga','mangaworld','mangaworldadult','rawkuma','tcbscans','lnori','scythescans','cocomic','manhwatoon','samuraiscan','mangaberri','mangacherri','chikari','rinkocomics','rokaricomics','dankefurslesen','thunderscans','mangakatana','mangademon','vortexscans','hijala','manhwanex','atsumaru'];
 const KEEP = new Set(ORDER);
-const EXTENDED = new Set<string>(['mangapill']);
+const EXTENDED = new Set<string>(['mangapill', 'komiku-harbor']);
 const TESTING = new Set<string>(['batcave', 'asura-seanime', 'reimanga', 'scansgg']);
 const TESTING_PREFIXES: string[] = [];
 const DEBUG_SKIP = new Set<string>(['batcave']);
