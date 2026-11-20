@@ -5,7 +5,7 @@ const DIST = path.join(process.cwd(), 'dist', 'manga');
 
 const ORDER = ['asura-seanime-v2','legion-scans','readcomicsonline-ru','batcave','ocecomic-com','latestcomics-en','toocomic-fr','weebcentral','kaynscan','projectsuki','nhentai','mgeko','kingofshojo','manhuaplus','flamecomics','hivetoons','mangadistrict','manhwaclub','lilymanga','mangaworld','mangaworldadult','rawkuma','tcbscans','lnori','scythescans','cocomic','manhwatoon','samuraiscan','mangaberri','mangacherri','chikari','rinkocomics','rokaricomics','dankefurslesen','thunderscans','mangakatana','mangademon','vortexscans','hijala','manhwanex','atsumaru'];
 const KEEP = new Set(ORDER);
-const EXTENDED = new Set<string>([]);
+const EXTENDED = new Set<string>(['mangapill']);
 const TESTING = new Set<string>(['batcave', 'asura-seanime', 'reimanga', 'scansgg']);
 const TESTING_PREFIXES: string[] = [];
 const DEBUG_SKIP = new Set<string>(['batcave']);
@@ -56,6 +56,9 @@ const rank = (p: any) => {
 const kept = all.filter((p) => KEEP.has(idOf(p))).sort((a, b) => rank(a) - rank(b));
 const extra = all.filter((p) => EXTENDED.has(idOf(p)));
 const testing = all.filter((p) => inTesting(p));
+if (extra.length === 0) {
+  throw new Error('Extended catalogue would duplicate Main: no Extended-only sources found');
+}
 const removed = all.filter((p) => !KEEP.has(idOf(p)) && !EXTENDED.has(idOf(p)) && !inTesting(p));
 for (const id of [...KEEP, ...EXTENDED, ...TESTING]) {
   if (!all.some((p) => idOf(p) === id)) {
@@ -110,7 +113,7 @@ if (testing.length > 0) {
 const extendedRepo = {
   ...repo,
   name: `${repo.name} (Extended)`,
-  description: `${repo.description ?? ''} Includes sources that work but may show a Cloudflare popup.`.trim(),
+  description: `${repo.description ?? ''} Includes additional sources with known caveats; compatibility may vary.`.trim(),
   plugins: [...kept, ...extra],
 };
 fs.writeFileSync(path.join(DIST, 'repo-extended.json'), JSON.stringify(extendedRepo, null, 2), 'utf-8');

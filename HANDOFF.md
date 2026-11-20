@@ -120,3 +120,11 @@ Not part of the current eBook phase. Do only if the user asks.
 - Promoted `asura-seanime-v2` to Main with manifest version 0.2.3; its provider code is unchanged from the tested 0.2.2 port.
 - The legacy `asura-seanime` provider remains in Testing. ReiManga and Scans.GG remain in Testing.
 - CI build/validation and checking live Main/Testing manifests are required before considering publication complete. Actual chapter reading inside Harbor still needs direct verification.
+
+## Public catalogue separation restored (2026-11-20)
+
+- **Main**: curated manga reader sources published at `manga/repo.json`. Do not modify Main when changing Extended or Testing.
+- **Extended**: separate public catalogue at `manga/repo-extended.json`, containing Main plus sources with disclosed limitations. It was incorrectly replaced on the Pages homepage by Testing on 2026-11-11; restored the public Extended option on 2026-11-20.
+- **Testing**: developer-only testing workflow at `manga/repo-testing.json`. Keep the manifest for diagnostics, but **never advertise or offer its installation URL on the public landing page**. This path remains technically public on GitHub Pages; it is not access-controlled.
+- Current Extended-only source: `mangapill` (its reader was user-tested, but browse-grid covers may be blank). BatCave is already in Main; Royal Road intentionally remains eBook-only. Do not silently restore removed/broken sources to Main or Extended.
+- The prune step must fail if Extended adds no distinct sources. Before promoting a new upstream Paperback/Seanime provider, verify Harbor-compatible list, detail, chapters, and reader images; preserve attribution and any applicable license.
